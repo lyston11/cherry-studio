@@ -98,11 +98,27 @@ const HomePage: FC = () => {
     [_setActiveTopic, dispatch]
   )
 
+  const setActiveConversation = useCallback(
+    (assistant: Assistant, topic: Topic) => {
+      startTransition(() => {
+        _setActiveAssistant((current) => (current?.id === assistant.id ? current : assistant))
+        _setActiveTopic((current) => (current?.id === topic.id ? current : topic))
+        dispatch(newMessagesActions.setTopicFulfilled({ topicId: topic.id, fulfilled: false }))
+      })
+    },
+    [_setActiveTopic, dispatch]
+  )
+
   useEffect(() => {
     NavigationService.setNavigate(navigate)
   }, [navigate])
 
   useEffect(() => {
+    if (state?.assistant && state?.topic) {
+      setActiveConversation(state.assistant, state.topic)
+      return
+    }
+
     state?.assistant && setActiveAssistant(state?.assistant)
     state?.topic && setActiveTopic(state?.topic)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -125,6 +141,7 @@ const HomePage: FC = () => {
           activeTopic={activeTopic}
           setActiveTopic={setActiveTopic}
           setActiveAssistant={setActiveAssistant}
+          setActiveConversation={setActiveConversation}
           position="left"
         />
       )}
@@ -142,6 +159,7 @@ const HomePage: FC = () => {
                   activeAssistant={activeAssistant}
                   activeTopic={activeTopic}
                   setActiveAssistant={setActiveAssistant}
+                  setActiveConversation={setActiveConversation}
                   setActiveTopic={setActiveTopic}
                   position="left"
                 />
@@ -155,6 +173,7 @@ const HomePage: FC = () => {
             activeTopic={activeTopic}
             setActiveTopic={setActiveTopic}
             setActiveAssistant={setActiveAssistant}
+            setActiveConversation={setActiveConversation}
           />
         </ErrorBoundary>
       </ContentContainer>

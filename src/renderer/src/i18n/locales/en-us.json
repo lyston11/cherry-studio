@@ -1027,6 +1027,9 @@
         "description": "Daily conversations and quick Q&A",
         "title": "Add Assistant"
       },
+      "group": {
+        "title": "New Group Chat"
+      },
       "option": {
         "title": "Select Type"
       },
@@ -1061,9 +1064,27 @@
     "deeply_thought": "Deeply thought ({{seconds}} seconds)",
     "default": {
       "description": "Hello, I'm Default Assistant. You can start chatting with me right away",
+      "group_topic": {
+        "name": "New Group Chat"
+      },
       "name": "Default Assistant",
       "topic": {
         "name": "Default Topic"
+      }
+    },
+    "group": {
+      "create": {
+        "empty": "Select at least one assistant before creating a group chat.",
+        "members": "Choose members",
+        "placeholder": "Group chat name (optional)"
+      },
+      "drop": {
+        "hint": "Drop here to add this assistant to the current group chat"
+      },
+      "members": {
+        "count": "{{count}} members",
+        "empty": "Drag a single chat from the left into this conversation to add it to the group",
+        "title": "Members"
       }
     },
     "history": {
@@ -1106,6 +1127,17 @@
       "pause": "Pause",
       "placeholder": "Type your message here, press {{key}} to send - @ to Select Model, / to Include Tools",
       "placeholder_without_triggers": "Type your message here, press {{key}} to send",
+      "participants": {
+        "assistant_action": "Drag the whole assistant or agent card into the area on the right, or click here to add it to the current chat",
+        "empty": "Drag assistants or agents from the left into this area, or click the + button beside one",
+        "team": {
+          "strategy": "Discussion Mode",
+          "selector": "Selector",
+          "round_robin": "Round Robin",
+          "turns": "Turns",
+          "moderator": "Moderator"
+        }
+      },
       "resource_panel": {
         "categories": {
           "agents": "Agents",

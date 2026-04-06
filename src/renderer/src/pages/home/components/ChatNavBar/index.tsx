@@ -4,7 +4,7 @@ import { useAssistant } from '@renderer/hooks/useAssistant'
 import { useNavbarPosition } from '@renderer/hooks/useSettings'
 import { useShortcut } from '@renderer/hooks/useShortcuts'
 import { useShowAssistants } from '@renderer/hooks/useStore'
-import type { Assistant, Topic } from '@renderer/types'
+import type { Assistant, CollaborativeTeamConfig, ConversationParticipant, Topic } from '@renderer/types'
 import { Tooltip } from 'antd'
 import { t } from 'i18next'
 import { Menu, PanelLeftClose, PanelRightClose } from 'lucide-react'
@@ -18,12 +18,27 @@ import ChatNavbarContent from './ChatNavbarContent'
 interface Props {
   activeAssistant: Assistant
   activeTopic: Topic
+  participants: ConversationParticipant[]
   setActiveTopic: (topic: Topic) => void
   setActiveAssistant: (assistant: Assistant) => void
+  setActiveConversation: (assistant: Assistant, topic: Topic) => void
+  teamConfig: Required<CollaborativeTeamConfig>
+  onRemoveParticipant: (participantId: string) => void
+  onTeamConfigChange: (config: CollaborativeTeamConfig) => void
   position: 'left' | 'right'
 }
 
-const HeaderNavbar: FC<Props> = ({ activeAssistant, setActiveAssistant, activeTopic, setActiveTopic }) => {
+const HeaderNavbar: FC<Props> = ({
+  activeAssistant,
+  setActiveAssistant,
+  setActiveConversation,
+  activeTopic,
+  participants,
+  setActiveTopic,
+  teamConfig,
+  onRemoveParticipant,
+  onTeamConfigChange
+}) => {
   const { assistant } = useAssistant(activeAssistant.id)
   const { showAssistants, toggleShowAssistants } = useShowAssistants()
   const { isTopNavbar } = useNavbarPosition()
@@ -36,6 +51,7 @@ const HeaderNavbar: FC<Props> = ({ activeAssistant, setActiveAssistant, activeTo
     void AssistantsDrawer.show({
       activeAssistant,
       setActiveAssistant,
+      setActiveConversation,
       activeTopic,
       setActiveTopic
     })
@@ -71,7 +87,14 @@ const HeaderNavbar: FC<Props> = ({ activeAssistant, setActiveAssistant, activeTo
             </motion.div>
           )}
         </AnimatePresence>
-        <ChatNavbarContent assistant={assistant} />
+        <ChatNavbarContent
+          assistant={assistant}
+          topic={activeTopic}
+          participants={participants}
+          teamConfig={teamConfig}
+          onRemoveParticipant={onRemoveParticipant}
+          onTeamConfigChange={onTeamConfigChange}
+        />
       </div>
     </NavbarHeader>
   )

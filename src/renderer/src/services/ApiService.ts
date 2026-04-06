@@ -148,6 +148,9 @@ export async function transformMessagesAndFetch(
     callbacks: StreamProcessorCallbacks
     topicId?: string // 添加 topicId 用于 trace
     allowedTools?: string[]
+    conversationOptions?: {
+      collaborative?: boolean
+    }
     options: {
       signal?: AbortSignal
       timeout?: number
@@ -159,7 +162,11 @@ export async function transformMessagesAndFetch(
   const { messages, assistant } = request
 
   try {
-    const { modelMessages, uiMessages } = await ConversationService.prepareMessagesForModel(messages, assistant)
+    const { modelMessages, uiMessages } = await ConversationService.prepareMessagesForModel(
+      messages,
+      assistant,
+      request.conversationOptions
+    )
 
     // replace prompt variables
     assistant.prompt = await replacePromptVariables(assistant.prompt, assistant.model?.name)

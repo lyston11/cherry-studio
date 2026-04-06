@@ -713,6 +713,20 @@ describe('messageConverter', () => {
       expect(textPart.text).toBe('Check this out: ![photo](https://example.com/photo.png)')
     })
 
+    it('prefixes participant assistant messages with their speaker label', async () => {
+      const model = createModel({ id: 'gpt-4o-mini' })
+      const assistant = createMessage('assistant')
+      assistant.participantLabel = '产品经理'
+      assistant.__mockContent = '我先从需求和优先级角度补充。'
+
+      const result = await convertMessageToSdkParam(assistant, false, model)
+      const textPart = ((result as any).content as Array<{ type: string; text: string }>).find(
+        (p) => p.type === 'text'
+      )!
+
+      expect(textPart.text).toBe('[产品经理] 我先从需求和优先级角度补充。')
+    })
+
     it('allows using LLM conversation context for image generation', async () => {
       // This test verifies the key use case: switching from LLM to image enhancement model
       // and using the previous conversation as context for image generation

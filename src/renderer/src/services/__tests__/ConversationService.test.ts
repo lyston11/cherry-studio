@@ -163,4 +163,44 @@ describe('ConversationService.filterMessagesPipeline', () => {
     expect(filtered[0].role).toBe('user')
     expect(filtered[filtered.length - 1].role).toBe('user')
   })
+
+  it('keeps participant transcript intact in collaborative mode', () => {
+    const topicId = 'topic-1'
+    const assistantId = 'assistant-1'
+
+    const user1Block = createMainTextBlock('user-1', 'Question', { status: MessageBlockStatus.SUCCESS })
+    const user1 = createMessage('user', topicId, assistantId, { id: 'user-1', blocks: [user1Block.id] })
+
+    const participant1Block = createMainTextBlock('assistant-1', 'Agent A reply', {
+      status: MessageBlockStatus.SUCCESS
+    })
+    const participant1 = createMessage('assistant', topicId, assistantId, {
+      id: 'assistant-1',
+      askId: 'user-1',
+      participantId: 'participant-a',
+      participantLabel: 'Agent A',
+      blocks: [participant1Block.id]
+    })
+
+    const participant2Block = createMainTextBlock('assistant-2', 'Agent B reply', {
+      status: MessageBlockStatus.SUCCESS
+    })
+    const participant2 = createMessage('assistant', topicId, assistantId, {
+      id: 'assistant-2',
+      askId: 'user-1',
+      participantId: 'participant-b',
+      participantLabel: 'Agent B',
+      blocks: [participant2Block.id]
+    })
+
+    mockStore.dispatch(messageBlocksSlice.actions.upsertOneBlock(user1Block))
+    mockStore.dispatch(messageBlocksSlice.actions.upsertOneBlock(participant1Block))
+    mockStore.dispatch(messageBlocksSlice.actions.upsertOneBlock(participant2Block))
+
+    const filtered = ConversationService.filterMessagesPipeline([user1, participant1, participant2], 10, {
+      collaborative: true
+    })
+
+    expect(filtered.map((message) => message.id)).toEqual(['user-1', 'assistant-1', 'assistant-2'])
+  })
 })

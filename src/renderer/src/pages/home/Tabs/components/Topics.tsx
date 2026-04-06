@@ -16,6 +16,7 @@ import { useSettings } from '@renderer/hooks/useSettings'
 import { finishTopicRenaming, startTopicRenaming, TopicManager } from '@renderer/hooks/useTopic'
 import { fetchMessagesSummary } from '@renderer/services/ApiService'
 import { getDefaultTopic } from '@renderer/services/AssistantService'
+import { isGroupConversationTopic } from '@renderer/services/ConversationParticipantService'
 import { EVENT_NAMES, EventEmitter } from '@renderer/services/EventService'
 import type { RootState } from '@renderer/store'
 import store from '@renderer/store'
@@ -53,6 +54,7 @@ import {
   Sparkles,
   Square,
   UploadIcon,
+  Users,
   XIcon
 } from 'lucide-react'
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
@@ -73,7 +75,7 @@ export const Topics: React.FC<Props> = ({ assistant: _assistant, activeTopic, se
   const { t } = useTranslation()
   const { notesPath } = useNotesSettings()
   const { assistants } = useAssistants()
-  const { assistant, addTopic, removeTopic, moveTopic, updateTopic, updateTopics } = useAssistant(_assistant.id)
+  const { assistant, addTopic, removeTopic, moveTopic, setModel, updateTopic, updateTopics } = useAssistant(_assistant.id)
   const { showTopicTime, pinTopicsToTop, setTopicPosition, topicPosition } = useSettings()
 
   const renamingTopics = useSelector((state: RootState) => state.runtime.chat.renamingTopics)
@@ -167,6 +169,17 @@ export const Topics: React.FC<Props> = ({ assistant: _assistant, activeTopic, se
     },
     [activeTopic.id, addTopic, assistant.id, assistant.topics, removeTopic, setActiveTopic]
   )
+
+  const addNewTopic = useCallback(async () => {
+    const newTopic = getDefaultTopic(assistant.id)
+
+    await db.topics.add({ id: newTopic.id, messages: [] })
+    if (assistant.defaultModel) {
+      setModel(assistant.defaultModel)
+    }
+    addTopic(newTopic)
+    setActiveTopic(newTopic)
+  }, [addTopic, assistant.defaultModel, assistant.id, setActiveTopic, setModel])
 
   const onPinTopic = useCallback(
     (topic: Topic) => {
@@ -570,9 +583,7 @@ export const Topics: React.FC<Props> = ({ assistant: _assistant, activeTopic, se
         itemContainerStyle={{ paddingBottom: '8px' }}
         header={
           <HeaderRow>
-            <AddButton onClick={() => EventEmitter.emit(EVENT_NAMES.ADD_NEW_TOPIC)}>
-              {t('chat.add.topic.title')}
-            </AddButton>
+            <AddButton onClick={() => void addNewTopic()}>{t('chat.add.topic.title')}</AddButton>
             <Tooltip title={t('chat.topics.manage.title')} mouseEnterDelay={0.5}>
               <HeaderIconButton
                 onClick={isManageMode ? exitManageMode : enterManageMode}
@@ -638,6 +649,11 @@ export const Topics: React.FC<Props> = ({ assistant: _assistant, activeTopic, se
                         <Square size={16} color="var(--color-text-3)" />
                       )}
                     </SelectIcon>
+                  )}
+                  {isGroupConversationTopic(topic) && (
+                    <TopicModeIcon title={t('chat.add.group.title')}>
+                      <Users size={14} />
+                    </TopicModeIcon>
                   )}
                   {editingTopicId === topic.id && isEditing ? (
                     <TopicEditInput {...inputProps} onClick={(e) => e.stopPropagation()} />
@@ -872,8 +888,6 @@ const HeaderRow = styled.div`
   align-items: center;
   gap: 6px;
   padding-right: 10px;
-  margin-bottom: 8px;
-  margin-top: 2px;
 `
 
 const HeaderIconButton = styled.div`
@@ -911,4 +925,11 @@ const SelectIcon = styled.div`
   &.disabled {
     opacity: 0.5;
   }
+`
+
+const TopicModeIcon = styled.div`
+  display: flex;
+  align-items: center;
+  color: var(--color-primary);
+  flex-shrink: 0;
 `

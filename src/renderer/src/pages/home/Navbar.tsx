@@ -24,10 +24,17 @@ interface Props {
   activeTopic: Topic
   setActiveTopic: (topic: Topic) => void
   setActiveAssistant: (assistant: Assistant) => void
+  setActiveConversation: (assistant: Assistant, topic: Topic) => void
   position: 'left' | 'right'
 }
 
-const HeaderNavbar: FC<Props> = ({ activeAssistant, setActiveAssistant, activeTopic, setActiveTopic }) => {
+const HeaderNavbar: FC<Props> = ({
+  activeAssistant,
+  setActiveAssistant,
+  setActiveConversation,
+  activeTopic,
+  setActiveTopic
+}) => {
   const { showAssistants, toggleShowAssistants } = useShowAssistants()
   const { topicPosition, narrowMode } = useSettings()
   const { showTopics, toggleShowTopics } = useShowTopics()
@@ -46,6 +53,7 @@ const HeaderNavbar: FC<Props> = ({ activeAssistant, setActiveAssistant, activeTo
     void AssistantsDrawer.show({
       activeAssistant,
       setActiveAssistant,
+      setActiveConversation,
       activeTopic,
       setActiveTopic
     })

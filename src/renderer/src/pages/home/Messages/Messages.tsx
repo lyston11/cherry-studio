@@ -12,8 +12,9 @@ import { useTimer } from '@renderer/hooks/useTimer'
 import { autoRenameTopic } from '@renderer/hooks/useTopic'
 import SelectionBox from '@renderer/pages/home/Messages/SelectionBox'
 import { getDefaultTopic } from '@renderer/services/AssistantService'
+import { isCollaborativeConversationTopic } from '@renderer/services/ConversationParticipantService'
 import { EVENT_NAMES, EventEmitter } from '@renderer/services/EventService'
-import { getContextCount, getGroupedMessages, getUserMessage } from '@renderer/services/MessagesService'
+import { getContextCount, getUserMessage } from '@renderer/services/MessagesService'
 import { estimateHistoryTokens } from '@renderer/services/TokenService'
 import store, { useAppDispatch } from '@renderer/store'
 import { messageBlocksSelectors, updateOneBlock } from '@renderer/store/messageBlock'
@@ -286,19 +287,9 @@ const Messages: React.FC<MessagesProps> = ({ assistant, topic, setActiveTopic, o
     requestAnimationFrame(() => onComponentUpdate?.())
   }, [onComponentUpdate])
 
-  // NOTE: 因为displayMessages是倒序的，所以得到的groupedMessages每个group内部也是倒序的，需要再倒一遍
   const groupedMessages = useMemo(() => {
-    const grouped = Object.entries(getGroupedMessages(displayMessages))
-    const newGrouped: {
-      [key: string]: (Message & {
-        index: number
-      })[]
-    } = {}
-    grouped.forEach(([key, group]) => {
-      newGrouped[key] = group.toReversed()
-    })
-    return Object.entries(newGrouped)
-  }, [displayMessages])
+    return getRenderableMessageGroups(displayMessages, topic)
+  }, [displayMessages, topic])
 
   return (
     <MessagesContainer
@@ -307,7 +298,7 @@ const Messages: React.FC<MessagesProps> = ({ assistant, topic, setActiveTopic, o
       ref={scrollContainerRef}
       key={assistant.id}
       onScroll={handleScrollPosition}>
-      <NarrowLayout style={{ display: 'flex', flexDirection: 'column-reverse' }}>
+      <NarrowLayout style={{ display: 'flex', flex: 1, minHeight: 0, flexDirection: 'column-reverse' }}>
         <InfiniteScroll
           dataLength={displayMessages.length}
           next={loadMoreMessages}
@@ -335,7 +326,9 @@ const Messages: React.FC<MessagesProps> = ({ assistant, topic, setActiveTopic, o
           </ContextMenu>
         </InfiniteScroll>
 
-        {showPrompt && <Prompt assistant={assistant} key={assistant.prompt} topic={topic} />}
+        {showPrompt && !isCollaborativeConversationTopic(topic) && (
+          <Prompt assistant={assistant} key={assistant.prompt} topic={topic} />
+        )}
       </NarrowLayout>
       {messageNavigation === 'anchor' && <MessageAnchorLine messages={displayMessages} />}
       <SelectionBox
@@ -395,3 +388,46 @@ const LoaderContainer = styled.div`
 `
 
 export default Messages
+
+function getRenderableMessageGroups(messages: Message[], topic: Topic) {
+  const groups: {
+    [key: string]: (Message & {
+      index: number
+    })[]
+  } = {}
+
+  messages.forEach((message, index) => {
+    const key = getRenderableMessageGroupKey(message, topic)
+    if (!groups[key]) {
+      groups[key] = []
+    }
+
+    groups[key].push({ ...message, index })
+  })
+
+  return Object.entries(groups).map(([key, group]) => [key, group.toReversed()] as const)
+}
+
+function getRenderableMessageGroupKey(message: Message, topic: Topic) {
+  if (isStandaloneCollaborativeTurn(message, topic)) {
+    return `${message.role}${message.id}`
+  }
+
+  if (message.role === 'assistant' && message.askId) {
+    return `assistant${message.askId}`
+  }
+
+  return `${message.role}${message.id}`
+}
+
+function isStandaloneCollaborativeTurn(message: Message, topic: Topic) {
+  if (message.role !== 'assistant') {
+    return false
+  }
+
+  if (!isCollaborativeConversationTopic(topic)) {
+    return false
+  }
+
+  return !!(message.participantId || message.participantLabel)
+}

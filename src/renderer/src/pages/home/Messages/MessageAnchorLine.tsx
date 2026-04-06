@@ -83,6 +83,10 @@ const MessageAnchorLine: FC<MessageLineProps> = ({ messages }) => {
 
   const getUserName = useCallback(
     (message: Message) => {
+      if (message.role === 'assistant' && message.participantLabel) {
+        return message.participantLabel
+      }
+
       if (isLocalAi && message.role !== 'user') {
         return APP_NAME
       }

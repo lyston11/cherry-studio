@@ -39,7 +39,7 @@ const MessageGroupModelList: FC<MessageGroupModelListProps> = ({ messages, selec
 
   const renderLabel = useCallback(
     (message: Message) => {
-      const modelTip = message.model?.name
+      const modelTip = message.participantLabel || message.model?.name
       const isProcessing = isMessageProcessing(message)
 
       if (isCompact) {
@@ -61,7 +61,7 @@ const MessageGroupModelList: FC<MessageGroupModelListProps> = ({ messages, selec
       return (
         <SegmentedLabel>
           <ModelAvatar className={isProcessing ? 'animation-pulse' : ''} model={message.model as Model} size={20} />
-          <ModelName>{message.model?.name}</ModelName>
+          <ModelName>{message.participantLabel || message.model?.name}</ModelName>
         </SegmentedLabel>
       )
     },

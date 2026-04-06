@@ -3,12 +3,17 @@ import MarqueeText from '@renderer/components/MarqueeText'
 import { useSettings } from '@renderer/hooks/useSettings'
 import AgentSettingsPopup from '@renderer/pages/settings/AgentSettings/AgentSettingsPopup'
 import { AgentLabel, isSoulModeEnabled } from '@renderer/pages/settings/AgentSettings/shared'
+import {
+  CONVERSATION_PARTICIPANT_MIME_TYPE,
+  isGroupConversationTopic
+} from '@renderer/services/ConversationParticipantService'
 import { EVENT_NAMES, EventEmitter } from '@renderer/services/EventService'
+import { useAppSelector } from '@renderer/store'
 import type { AgentEntity } from '@renderer/types'
 import { cn } from '@renderer/utils'
 import type { MenuProps } from 'antd'
 import { Dropdown, Tooltip } from 'antd'
-import { Bot, MoreVertical } from 'lucide-react'
+import { Bot, MoreVertical, Plus } from 'lucide-react'
 import { memo, useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -24,6 +29,8 @@ interface AgentItemProps {
 const AgentItem = ({ agent, isActive, onDelete, onPress }: AgentItemProps) => {
   const { t } = useTranslation()
   const { clickAssistantToShowTopic, topicPosition, assistantIconType } = useSettings()
+  const activeTopic = useAppSelector((state) => state.runtime.chat.activeTopic)
+  const canJoinActiveGroup = isGroupConversationTopic(activeTopic ?? undefined)
   const [isHovered, setIsHovered] = useState(false)
 
   const handlePress = useCallback(() => {
@@ -39,6 +46,34 @@ const AgentItem = ({ agent, isActive, onDelete, onPress }: AgentItemProps) => {
   const handleMenuButtonClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
   }, [])
+
+  const handleParticipantDragStart = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      if (!canJoinActiveGroup) {
+        event.preventDefault()
+        return
+      }
+
+      event.stopPropagation()
+      event.dataTransfer.effectAllowed = 'copy'
+      event.dataTransfer.setData(
+        CONVERSATION_PARTICIPANT_MIME_TYPE,
+        JSON.stringify({
+          participantType: 'agent',
+          agentId: agent.id
+        })
+      )
+    },
+    [agent.id, canJoinActiveGroup]
+  )
+
+  const handleAddParticipantClick = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      event.stopPropagation()
+      void EventEmitter.emit(EVENT_NAMES.ADD_TOPIC_PARTICIPANT, { agentId: agent.id })
+    },
+    [agent.id]
+  )
 
   const menuItems: MenuProps['items'] = useMemo(
     () => [
@@ -73,7 +108,9 @@ const AgentItem = ({ agent, isActive, onDelete, onPress }: AgentItemProps) => {
       trigger={['contextMenu']}
       popupRender={(menu) => <div onPointerDown={(e) => e.stopPropagation()}>{menu}</div>}>
       <Container
+        draggable={canJoinActiveGroup}
         onClick={handlePress}
+        onDragStart={handleParticipantDragStart}
         isActive={isActive}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}>
@@ -82,6 +119,13 @@ const AgentItem = ({ agent, isActive, onDelete, onPress }: AgentItemProps) => {
             <AgentLabel agent={agent} hideIcon={assistantIconType === 'none'} />
           </MarqueeText>
           {isSoulModeEnabled(agent.configuration) && <SoulTag>SOUL</SoulTag>}
+          {canJoinActiveGroup && (isActive || isHovered) && (
+            <Tooltip title={t('chat.input.participants.assistant_action')}>
+              <MenuButton onClick={handleAddParticipantClick} onMouseDown={(e) => e.stopPropagation()}>
+                <Plus size={14} className="text-(--color-text-secondary)" />
+              </MenuButton>
+            </Tooltip>
+          )}
           {(isActive || isHovered) && (
             <Dropdown
               menu={{ items: menuItems }}

@@ -10,6 +10,7 @@ import { useChatContext } from '@renderer/hooks/useChatContext'
 import { useMinappPopup } from '@renderer/hooks/useMinappPopup'
 import { useRuntime } from '@renderer/hooks/useRuntime'
 import { useMessageStyle, useSettings } from '@renderer/hooks/useSettings'
+import { getParticipantById } from '@renderer/services/ConversationParticipantService'
 import { getMessageModelId } from '@renderer/services/MessagesService'
 import { getModelName } from '@renderer/services/ModelService'
 import type { Assistant, Model, Topic } from '@renderer/types'
@@ -55,8 +56,13 @@ const MessageHeader: FC<Props> = memo(({ assistant, model, message, topic, isGro
   const isSelected = selectedMessageIds?.includes(message.id)
 
   const avatarSource = useMemo(() => getAvatarSource(isLocalAi, getMessageModelId(message)), [message])
+  const participant = useMemo(() => getParticipantById(topic, message.participantId), [message.participantId, topic])
 
   const getUserName = useCallback(() => {
+    if (message.role === 'assistant' && message.participantLabel) {
+      return message.participantLabel
+    }
+
     if (isLocalAi && message.role !== 'user') {
       return APP_NAME
     }
@@ -75,9 +81,17 @@ const MessageHeader: FC<Props> = memo(({ assistant, model, message, topic, isGro
   const isAssistantMessage = message.role === 'assistant'
   const isUserMessage = message.role === 'user'
   const showMinappIcon = sidebarIcons.visible.includes('minapp')
+  const hasConversationSpeakerIdentity = isAssistantMessage && !!(message.participantId || message.participantLabel)
 
   const avatarName = useMemo(() => firstLetter(assistant?.name).toUpperCase(), [assistant?.name])
   const username = useMemo(() => removeLeadingEmoji(getUserName()), [getUserName])
+  const speakerAvatar = participant?.emoji
+  const speakerAvatarIsEmoji = !!speakerAvatar && isEmoji(speakerAvatar)
+  const speakerAvatarSrc = speakerAvatar && !speakerAvatarIsEmoji ? speakerAvatar : undefined
+  const speakerAvatarFallback = useMemo(() => firstLetter(username || assistant?.name || 'A').toUpperCase(), [
+    assistant?.name,
+    username
+  ])
 
   const showMiniApp = useCallback(() => {
     showMinappIcon && model?.provider && openMinappById(model.provider)
@@ -94,18 +108,24 @@ const MessageHeader: FC<Props> = memo(({ assistant, model, message, topic, isGro
   return (
     <Container className="message-header">
       {isAssistantMessage ? (
-        <Avatar
-          src={avatarSource}
-          size={35}
-          style={{
-            borderRadius: '25%',
-            cursor: showMinappIcon ? 'pointer' : 'default',
-            border: isLocalAi ? '1px solid var(--color-border-soft)' : 'none',
-            filter: theme === 'dark' ? 'invert(0.05)' : undefined
-          }}
-          onClick={showMiniApp}>
-          {avatarName}
-        </Avatar>
+        speakerAvatarIsEmoji ? (
+          <EmojiAvatar size={35} fontSize={20}>
+            {speakerAvatar}
+          </EmojiAvatar>
+        ) : (
+          <Avatar
+            src={hasConversationSpeakerIdentity ? speakerAvatarSrc : avatarSource}
+            size={35}
+            style={{
+              borderRadius: '25%',
+              cursor: showMinappIcon ? 'pointer' : 'default',
+              border: isLocalAi ? '1px solid var(--color-border-soft)' : 'none',
+              filter: !hasConversationSpeakerIdentity && theme === 'dark' ? 'invert(0.05)' : undefined
+            }}
+            onClick={showMiniApp}>
+            {hasConversationSpeakerIdentity ? speakerAvatarFallback : avatarName}
+          </Avatar>
+        )
       ) : (
         <>
           {isEmoji(avatar) ? (

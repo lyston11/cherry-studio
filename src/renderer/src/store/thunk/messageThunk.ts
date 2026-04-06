@@ -19,21 +19,55 @@ import { AiSdkToChunkAdapter } from '@renderer/aiCore/chunk/AiSdkToChunkAdapter'
 import { AgentApiClient } from '@renderer/api/agent'
 import db from '@renderer/databases'
 import { getModel } from '@renderer/hooks/useModel'
-import { fetchMessagesSummary, transformMessagesAndFetch } from '@renderer/services/ApiService'
+import { fetchGenerate, fetchMessagesSummary, transformMessagesAndFetch } from '@renderer/services/ApiService'
+import { getAssistantById } from '@renderer/services/AssistantService'
+import {
+  buildAgentParticipantTurnPrompt,
+  buildConversationResponseTargets,
+  buildParticipantDiscussionPrompt,
+  buildParticipantTranscript,
+  type ConversationResponseTarget,
+  filterMessagesForParticipantContext,
+  getResponseTargetForMessage,
+  isCollaborativeConversationTopic,
+  updateTopicParticipant
+} from '@renderer/services/ConversationParticipantService'
+import {
+  buildHiddenOrchestratorPrompt,
+  buildSelectedSpeakerPrompt,
+  type CollaborativeDiscussionSignals,
+  type CollaborativeTargetCapabilitySummary,
+  getCollaborativeDiscussionSignals,
+  getConversationResponseTargetKey,
+  getConversationResponseTargetLabel,
+  getTopicTeamConfig,
+  parseCollaborativeTurnPlan,
+  selectNextResponseTargetFallback
+} from '@renderer/services/ConversationTeamService'
 import { dbService } from '@renderer/services/db'
 import { DbService } from '@renderer/services/db/DbService'
 import FileManager from '@renderer/services/FileManager'
 import { BlockManager } from '@renderer/services/messageStreaming/BlockManager'
 import { createCallbacks } from '@renderer/services/messageStreaming/callbacks'
+import { getModelUniqId } from '@renderer/services/ModelService'
 import { endSpan } from '@renderer/services/SpanManagerService'
 import { createStreamProcessor, type StreamProcessorCallbacks } from '@renderer/services/StreamProcessingService'
 import store from '@renderer/store'
-import { updateTopicUpdatedAt } from '@renderer/store/assistants'
-import { type ApiServerConfig, type Assistant, type FileMetadata, type Model, type Topic } from '@renderer/types'
+import { updateTopic as updateAssistantTopic, updateTopicUpdatedAt } from '@renderer/store/assistants'
+import {
+  type ApiServerConfig,
+  type Assistant,
+  type FileMetadata,
+  getEffectiveMcpMode,
+  type Model,
+  type Topic
+} from '@renderer/types'
 import type {
   AgentEffort,
   AgentSessionEntity,
   AgentThinkingConfig,
+  CreateSessionForm,
+  GetAgentResponse,
   GetAgentSessionResponse
 } from '@renderer/types/agent'
 import { ChunkType } from '@renderer/types/chunk'
@@ -51,6 +85,7 @@ import {
   extractAgentSessionIdFromTopicId,
   isAgentSessionTopicId
 } from '@renderer/utils/agentSession'
+import { isPromptToolUse, isSupportedToolUse } from '@renderer/utils/assistant'
 import {
   createAssistantMessage,
   createTranslationBlock,
@@ -100,6 +135,40 @@ type AgentSessionContext = {
 
 const agentSessionRenameLocks = new Set<string>()
 const dbFacade = DbService.getInstance()
+
+const createAgentClient = (apiServer: ApiServerConfig) =>
+  new AgentApiClient({
+    baseURL: buildAgentBaseURL(apiServer),
+    headers: {
+      Authorization: `Bearer ${apiServer.apiKey}`
+    }
+  })
+
+const getModelFromAgent = (agent: Pick<GetAgentResponse, 'model'>) => {
+  const [providerId, modelId] = agent.model?.split(':') ?? [undefined, undefined]
+
+  if (providerId && modelId) {
+    return getModel(modelId, providerId)
+  }
+
+  return getModel(agent.model)
+}
+
+const createAssistantStubFromAgent = (agent: GetAgentResponse): Assistant => {
+  const model = getModelFromAgent(agent)
+
+  return {
+    id: agent.id,
+    name: agent.name ?? agent.id,
+    prompt: agent.instructions ?? '',
+    topics: [],
+    type: 'agent-session',
+    model,
+    defaultModel: model,
+    tags: [],
+    enableWebSearch: false
+  }
+}
 
 const findExistingAgentSessionContext = (
   state: RootState,
@@ -615,12 +684,24 @@ interface AgentStreamParams {
   assistantMessage: Message
   agentSession: AgentSessionContext
   userMessageId: string
+  requestContent?: string
+  persistUserMessageSessionId?: boolean
+  onAgentSessionIdPersisted?: (sessionId: string) => Promise<void> | void
 }
 
 const fetchAndProcessAgentResponseImpl = async (
   dispatch: AppDispatch,
   getState: () => RootState,
-  { topicId, assistant, assistantMessage, agentSession, userMessageId }: AgentStreamParams
+  {
+    topicId,
+    assistant,
+    assistantMessage,
+    agentSession,
+    userMessageId,
+    requestContent,
+    persistUserMessageSessionId = true,
+    onAgentSessionIdPersisted
+  }: AgentStreamParams
 ) => {
   let callbacks: StreamProcessorCallbacks = {}
   try {
@@ -654,7 +735,7 @@ const fetchAndProcessAgentResponseImpl = async (
 
     const state = getState()
     const userMessageEntity = state.messages.entities[userMessageId]
-    const userContent = userMessageEntity ? getMainTextContent(userMessageEntity) : ''
+    const userContent = requestContent ?? (userMessageEntity ? getMainTextContent(userMessageEntity) : '')
 
     const abortController = new AbortController()
     addAbortController(userMessageId, () => abortController.abort())
@@ -705,7 +786,7 @@ const fetchAndProcessAgentResponseImpl = async (
           persistTasks.push(saveUpdatesToDB(assistantMessage.id, topicId, { agentSessionId: sessionId }, []))
         }
 
-        if (userInState && userInState.agentSessionId !== sessionId) {
+        if (persistUserMessageSessionId && userInState && userInState.agentSessionId !== sessionId) {
           dispatch(
             newMessagesActions.updateMessage({
               topicId,
@@ -719,6 +800,8 @@ const fetchAndProcessAgentResponseImpl = async (
         if (persistTasks.length > 0) {
           await Promise.all(persistTasks)
         }
+
+        await onAgentSessionIdPersisted?.(sessionId)
 
         // Refresh session data to get updated slash_commands from backend
         // This happens after the SDK init message updates the session in the database
@@ -780,51 +863,746 @@ const fetchAndProcessAgentResponseImpl = async (
 // These are no longer needed since messages are saved immediately via appendMessage
 // and updated during streaming via updateMessageAndBlocks
 
-// --- Helper Function for Multi-Model Dispatch ---
-// 多模型创建和发送请求的逻辑，用于用户消息多模型发送和重发
-const dispatchMultiModelResponses = async (
+const getTopicFromState = (state: RootState, topicId: string) =>
+  state.assistants.assistants.flatMap((assistant) => assistant.topics).find((topic) => topic.id === topicId)
+
+const persistTopicParticipantUpdates = async (
+  dispatch: AppDispatch,
+  getState: () => RootState,
+  topicId: string,
+  participantId: string | undefined,
+  updates: Parameters<typeof updateTopicParticipant>[2]
+) => {
+  if (!participantId) {
+    return
+  }
+
+  const topic = getTopicFromState(getState(), topicId)
+  if (!topic) {
+    return
+  }
+
+  const nextTopic = updateTopicParticipant(topic, participantId, updates)
+  if (nextTopic === topic) {
+    return
+  }
+
+  nextTopic.updatedAt = new Date().toISOString()
+  dispatch(updateAssistantTopic({ assistantId: topic.assistantId, topic: nextTopic }))
+  await db.topics
+    .where('id')
+    .equals(topicId)
+    .modify((dbTopic: Record<string, unknown>) => {
+      dbTopic.participants = nextTopic.participants
+      dbTopic.updatedAt = nextTopic.updatedAt
+    })
+}
+
+type ResolveConversationAgent = (agentId: string) => Promise<GetAgentResponse>
+
+const createConversationAgentResolver = (
+  getState: () => RootState,
+  requestCache = new Map<string, Promise<GetAgentResponse>>()
+): ResolveConversationAgent => {
+  return async (agentId: string) => {
+    const cached = requestCache.get(agentId)
+    if (cached) {
+      return cached
+    }
+
+    const { apiServer } = getState().settings
+    if (!apiServer.enabled || !apiServer.apiKey) {
+      throw new Error('Agent API server is disabled')
+    }
+
+    const request = createAgentClient(apiServer).getAgent(agentId)
+    requestCache.set(agentId, request)
+
+    try {
+      return await request
+    } catch (error) {
+      requestCache.delete(agentId)
+      throw error
+    }
+  }
+}
+
+const ensureAgentParticipantSession = async (
+  dispatch: AppDispatch,
+  getState: () => RootState,
+  topicId: string,
+  target: Extract<ConversationResponseTarget, { kind: 'agent' }>,
+  prefetchedAgent?: GetAgentResponse
+) => {
+  const { apiServer } = getState().settings
+  if (!apiServer.enabled) {
+    throw new Error('Agent API server is disabled')
+  }
+
+  const client = createAgentClient(apiServer)
+  const agent = prefetchedAgent ?? (await client.getAgent(target.agentId))
+  const model = target.model ?? getModelFromAgent(agent)
+  let sessionId = target.sessionId
+
+  if (!sessionId) {
+    const sessionForm: CreateSessionForm = {
+      name: agent.name,
+      description: agent.description,
+      instructions: agent.instructions,
+      model: agent.model,
+      plan_model: agent.plan_model,
+      small_model: agent.small_model,
+      accessible_paths: agent.accessible_paths,
+      allowed_tools: agent.allowed_tools,
+      mcps: agent.mcps,
+      slash_commands: agent.slash_commands,
+      configuration: agent.configuration
+    }
+
+    const session = await client.createSession(agent.id, sessionForm)
+    sessionId = session.id
+  }
+
+  await persistTopicParticipantUpdates(dispatch, getState, topicId, target.participantId, {
+    label: agent.name || target.participantLabel,
+    emoji: agent.configuration?.avatar,
+    model,
+    sessionId
+  })
+
+  return {
+    agent,
+    assistant: createAssistantStubFromAgent(agent),
+    model,
+    sessionId
+  }
+}
+
+const getResponseTargetMatchKey = (target: ConversationResponseTarget) => {
+  if (target.participantId) {
+    return `participant:${target.participantId}`
+  }
+
+  return `model:${getModelUniqId(target.model)}`
+}
+
+const getAssistantMessageMatchKey = (message: Message) => {
+  if (message.participantId) {
+    return `participant:${message.participantId}`
+  }
+
+  if (message.model) {
+    return `model:${getModelUniqId(message.model)}`
+  }
+
+  if (message.modelId) {
+    return `model:${message.modelId}`
+  }
+
+  return `message:${message.id}`
+}
+
+const createAssistantMessageForTarget = ({
+  target,
+  topicId,
+  askId,
+  traceId
+}: {
+  target: ConversationResponseTarget
+  topicId: string
+  askId: string
+  traceId?: string
+}) => {
+  const assistantMessage = createAssistantMessage(
+    target.kind === 'assistant' ? target.assistantConfig.id : target.agentId,
+    topicId,
+    {
+      askId,
+      model: target.model,
+      modelId: target.model?.id,
+      participantId: target.participantId,
+      participantLabel: target.participantLabel,
+      traceId
+    }
+  )
+
+  if (target.kind === 'agent' && target.agentSessionId) {
+    assistantMessage.agentSessionId = target.agentSessionId
+  }
+
+  return assistantMessage
+}
+
+const persistConversationMessageStub = async (
+  dispatch: AppDispatch,
+  topicId: string,
+  assistantMessage: Message,
+  insertAtIndex: number = -1
+) => {
+  await saveMessageAndBlocksToDB(topicId, assistantMessage, [], insertAtIndex)
+  if (insertAtIndex >= 0) {
+    dispatch(
+      newMessagesActions.insertMessageAtIndex({
+        topicId,
+        message: assistantMessage,
+        index: insertAtIndex
+      })
+    )
+    return
+  }
+
+  dispatch(newMessagesActions.addMessage({ topicId, message: assistantMessage }))
+}
+
+const createConversationResponseRunner = ({
+  dispatch,
+  getState,
+  topicId,
+  triggeringMessage,
+  target,
+  assistantMessage,
+  executionOptions
+}: {
+  dispatch: AppDispatch
+  getState: () => RootState
+  topicId: string
+  triggeringMessage: Message
+  target: ConversationResponseTarget | null
+  assistantMessage: Message
+  executionOptions?: {
+    turnPrompt?: string
+    forceCollaborativeContext?: boolean
+    prefetchedAgent?: GetAgentResponse
+  }
+}) => {
+  if (!target || target.kind === 'assistant') {
+    const fallbackAssistant = getAssistantById(assistantMessage.assistantId)
+    const assistantConfig =
+      target?.assistantConfig ??
+      (fallbackAssistant
+        ? {
+            ...fallbackAssistant,
+            ...(assistantMessage.model ? { model: assistantMessage.model } : {})
+          }
+        : null)
+
+    return async () => {
+      if (!assistantConfig) {
+        throw new Error(`Assistant ${assistantMessage.assistantId} not found for response target.`)
+      }
+
+      await fetchAndProcessAssistantResponseImpl(dispatch, getState, topicId, assistantConfig, assistantMessage, {
+        extraPrompt: executionOptions?.turnPrompt,
+        forceCollaborativeContext: executionOptions?.forceCollaborativeContext
+      })
+    }
+  }
+
+  return async () => {
+    const ensuredTarget = await ensureAgentParticipantSession(
+      dispatch,
+      getState,
+      topicId,
+      target,
+      executionOptions?.prefetchedAgent
+    )
+    const assistantForAgent = {
+      ...ensuredTarget.assistant,
+      model: ensuredTarget.model ?? ensuredTarget.assistant.model,
+      defaultModel: ensuredTarget.model ?? ensuredTarget.assistant.defaultModel
+    }
+
+    if (
+      ensuredTarget.model &&
+      (assistantMessage.modelId !== ensuredTarget.model.id || assistantMessage.model?.provider !== ensuredTarget.model.provider)
+    ) {
+      dispatch(
+        newMessagesActions.updateMessage({
+          topicId,
+          messageId: assistantMessage.id,
+          updates: {
+            model: ensuredTarget.model,
+            modelId: ensuredTarget.model.id
+          }
+        })
+      )
+      await saveUpdatesToDB(
+        assistantMessage.id,
+        topicId,
+        {
+          model: ensuredTarget.model,
+          modelId: ensuredTarget.model.id
+        },
+        []
+      )
+    }
+
+    const topic = getTopicFromState(getState(), topicId)
+    const messages = selectMessagesForTopic(getState(), topicId).filter((message) => message.id !== assistantMessage.id)
+    const requestContent = [executionOptions?.turnPrompt, buildAgentParticipantTurnPrompt({
+      participantLabel: assistantMessage.participantLabel ?? target.participantLabel,
+      topic,
+      messages
+    })]
+      .filter(Boolean)
+      .join('\n\n')
+
+    await fetchAndProcessAgentResponseImpl(dispatch, getState, {
+      topicId,
+      assistant: assistantForAgent,
+      assistantMessage,
+      agentSession: {
+        agentId: target.agentId,
+        sessionId: ensuredTarget.sessionId,
+        agentSessionId: target.agentSessionId
+      },
+      userMessageId: triggeringMessage.id,
+      requestContent,
+      persistUserMessageSessionId: false,
+      onAgentSessionIdPersisted: async (agentSessionId) => {
+        await persistTopicParticipantUpdates(dispatch, getState, topicId, target.participantId, {
+          sessionId: ensuredTarget.sessionId,
+          agentSessionId
+        })
+      }
+    })
+  }
+}
+
+const getHiddenOrchestratorAssistant = ({
+  topic,
+  assistant,
+}: {
+  topic?: Topic
+  assistant: Assistant
+}) => {
+  const topicOwnerAssistant = topic ? getAssistantById(topic.assistantId) : undefined
+  const orchestrator = topicOwnerAssistant ?? assistant
+  const model = orchestrator.model ?? orchestrator.defaultModel ?? assistant.model ?? assistant.defaultModel
+
+  return {
+    ...orchestrator,
+    ...(model ? { model, defaultModel: model } : {})
+  }
+}
+
+const formatCapabilityPreview = (items: Array<string | undefined>, limit = 3) => {
+  const normalized = items.map((item) => item?.trim()).filter(Boolean) as string[]
+  if (normalized.length === 0) {
+    return undefined
+  }
+
+  const preview = normalized.slice(0, limit).join(', ')
+  return normalized.length > limit ? `${preview}, +${normalized.length - limit} more` : preview
+}
+
+const describeAssistantTargetCapabilities = (target: Extract<ConversationResponseTarget, { kind: 'assistant' }>) => {
+  const assistantConfig = target.assistantConfig
+  const capabilityNotes: string[] = []
+  const mcpMode = getEffectiveMcpMode(assistantConfig)
+  const activeMcpServers = assistantConfig.mcpServers?.filter((server) => server.isActive) ?? []
+  const activeMcpPreview = formatCapabilityPreview(activeMcpServers.map((server) => server.name || server.id))
+  const knowledgeBaseCount = assistantConfig.knowledge_bases?.length ?? 0
+
+  if (isSupportedToolUse(assistantConfig)) {
+    capabilityNotes.push('function tools')
+  } else if (isPromptToolUse(assistantConfig)) {
+    capabilityNotes.push('prompt-guided tools')
+  }
+
+  if (mcpMode === 'auto') {
+    capabilityNotes.push('MCP hub tools (auto)')
+  } else if (mcpMode === 'manual') {
+    capabilityNotes.push(
+      activeMcpPreview
+        ? `manual MCP servers: ${activeMcpPreview}`
+        : activeMcpServers.length > 0
+          ? `manual MCP servers (${activeMcpServers.length})`
+          : 'manual MCP access'
+    )
+  }
+
+  if (assistantConfig.enableWebSearch) {
+    capabilityNotes.push(
+      assistantConfig.webSearchProviderId ? `web search via ${assistantConfig.webSearchProviderId}` : 'web search'
+    )
+  }
+
+  if (assistantConfig.knowledgeRecognition === 'on' || knowledgeBaseCount > 0) {
+    capabilityNotes.push(
+      knowledgeBaseCount > 0 ? `knowledge retrieval (${knowledgeBaseCount} knowledge bases)` : 'knowledge retrieval'
+    )
+  }
+
+  if (assistantConfig.enableUrlContext) {
+    capabilityNotes.push('URL context')
+  }
+
+  if (assistantConfig.enableGenerateImage) {
+    capabilityNotes.push('image generation')
+  }
+
+  if (assistantConfig.enableMemory) {
+    capabilityNotes.push('memory')
+  }
+
+  return capabilityNotes.length > 0 ? capabilityNotes.join('; ') : 'general reasoning and conversation'
+}
+
+const describeAgentTargetCapabilities = (agent: GetAgentResponse) => {
+  const capabilityNotes: string[] = []
+  const toolPreview = formatCapabilityPreview(agent.allowed_tools ?? [])
+  const mcpPreview = formatCapabilityPreview(agent.mcps ?? [])
+  const slashPreview = formatCapabilityPreview(agent.slash_commands?.map((command) => command.command) ?? [])
+  const pathPreview = formatCapabilityPreview(agent.accessible_paths ?? [])
+
+  if (toolPreview) {
+    capabilityNotes.push(`tools: ${toolPreview}`)
+  }
+
+  if (mcpPreview) {
+    capabilityNotes.push(`MCPs: ${mcpPreview}`)
+  }
+
+  if (slashPreview) {
+    capabilityNotes.push(`commands: ${slashPreview}`)
+  }
+
+  if (pathPreview) {
+    capabilityNotes.push(`files: ${pathPreview}`)
+  }
+
+  return capabilityNotes.length > 0 ? capabilityNotes.join('; ') : 'general agent reasoning'
+}
+
+const buildCollaborativeTargetCapabilitySummaries = async ({
+  getState,
+  targets,
+  resolveAgent
+}: {
+  getState: () => RootState
+  targets: ConversationResponseTarget[]
+  resolveAgent?: ResolveConversationAgent
+}): Promise<CollaborativeTargetCapabilitySummary> => {
+  const summaries: CollaborativeTargetCapabilitySummary = {}
+  const agentTargets = targets.filter((target): target is Extract<ConversationResponseTarget, { kind: 'agent' }> => target.kind === 'agent')
+  const apiServer = getState().settings.apiServer
+  const agentClient = agentTargets.length > 0 && apiServer.enabled && apiServer.apiKey ? createAgentClient(apiServer) : undefined
+
+  await Promise.all(
+    targets.map(async (target) => {
+      const targetKey = getConversationResponseTargetKey(target)
+
+      if (target.kind === 'assistant') {
+        summaries[targetKey] = describeAssistantTargetCapabilities(target)
+        return
+      }
+
+      if (!agentClient) {
+        summaries[targetKey] = 'general agent reasoning'
+        return
+      }
+
+      try {
+        const agent = resolveAgent ? await resolveAgent(target.agentId) : await agentClient.getAgent(target.agentId)
+        summaries[targetKey] = describeAgentTargetCapabilities(agent)
+      } catch (error) {
+        logger.warn(`Failed to load capabilities for group agent ${target.agentId}`, error as Error)
+        summaries[targetKey] = 'general agent reasoning'
+      }
+    })
+  )
+
+  return summaries
+}
+
+type PlannedCollaborativeTurn =
+  | {
+      action: 'finish'
+    }
+  | {
+      action: 'speak'
+      target: ConversationResponseTarget
+      instruction?: string
+    }
+
+const planNextCollaborativeTurn = async ({
+  assistant,
+  topic,
+  messages,
+  targets,
+  usedTargetKeys,
+  turnIndex,
+  maxTurns,
+  lastSpeakerKey,
+  targetCapabilitySummaries,
+  discussionSignals
+}: {
+  assistant: Assistant
+  topic?: Topic
+  messages: Message[]
+  targets: ConversationResponseTarget[]
+  usedTargetKeys: string[]
+  turnIndex: number
+  maxTurns: number
+  lastSpeakerKey?: string
+  targetCapabilitySummaries: CollaborativeTargetCapabilitySummary
+  discussionSignals: CollaborativeDiscussionSignals
+}) => {
+  const eligibleTargets =
+    targets.length > 1 && lastSpeakerKey
+      ? targets.filter((target) => getConversationResponseTargetKey(target) !== lastSpeakerKey)
+      : targets
+
+  if (turnIndex > 0 && discussionSignals.visibleReplyCount >= discussionSignals.suggestedVisibleReplyCount) {
+    return { action: 'finish' } satisfies PlannedCollaborativeTurn
+  }
+
+  const planningTargets = eligibleTargets.length > 0 ? eligibleTargets : targets
+  if (planningTargets.length === 1) {
+    return {
+      action: 'speak',
+      target: planningTargets[0]
+    } satisfies PlannedCollaborativeTurn
+  }
+
+  if (turnIndex === 0 && discussionSignals.directlyAddressedParticipants.length === 1) {
+    const directlyAddressedTarget = planningTargets.find(
+      (target) =>
+        getConversationResponseTargetLabel(target).toLowerCase() ===
+        discussionSignals.directlyAddressedParticipants[0].toLowerCase()
+    )
+
+    if (directlyAddressedTarget) {
+      return {
+        action: 'speak',
+        target: directlyAddressedTarget,
+        instruction:
+          discussionSignals.suggestedVisibleReplyCount > 1
+            ? 'Open with your main take first, then leave room for others to add a different angle if needed.'
+            : 'Give the direct main answer in a concise, natural way.'
+      } satisfies PlannedCollaborativeTurn
+    }
+  }
+
+  const lastSpeakerLabel = lastSpeakerKey
+    ? getConversationResponseTargetLabel(
+        targets.find((target) => getConversationResponseTargetKey(target) === lastSpeakerKey) ?? targets[0]
+      )
+    : undefined
+  const orchestratorAssistant = getHiddenOrchestratorAssistant({
+    topic,
+    assistant
+  })
+  const plannerPrompt = [orchestratorAssistant.prompt, buildHiddenOrchestratorPrompt({
+    topic,
+    targets: planningTargets,
+    turnIndex,
+    maxTurns,
+    lastSpeakerLabel,
+    hasVisibleReplies: turnIndex > 0,
+    targetCapabilitySummaries,
+    latestUserRequest: discussionSignals.latestUserRequest,
+    directlyAddressedParticipants: discussionSignals.directlyAddressedParticipants,
+    suggestedVisibleReplyCount: discussionSignals.suggestedVisibleReplyCount,
+    visibleReplyCount: discussionSignals.visibleReplyCount
+  })]
+    .filter(Boolean)
+    .join('\n\n')
+  const transcript = buildParticipantTranscript(messages)
+
+  const rawPlan = await fetchGenerate({
+    prompt: plannerPrompt,
+    content: transcript || 'No discussion transcript yet.',
+    model: orchestratorAssistant.model
+  })
+
+  const plannedTurn = parseCollaborativeTurnPlan(rawPlan, planningTargets)
+  if (plannedTurn?.action === 'finish' && turnIndex > 0) {
+    return plannedTurn
+  }
+
+  if (plannedTurn?.action === 'speak') {
+    const target = targets.find((item) => getConversationResponseTargetKey(item) === plannedTurn.speakerId)
+    if (target) {
+      return {
+        action: 'speak',
+        target,
+        instruction: plannedTurn.instruction
+      } satisfies PlannedCollaborativeTurn
+    }
+  }
+
+  const fallbackTarget = selectNextResponseTargetFallback({
+    targets,
+    messages,
+    usedTargetKeys,
+    lastSpeakerKey
+  })
+
+  if (!fallbackTarget) {
+    return turnIndex > 0 ? ({ action: 'finish' } satisfies PlannedCollaborativeTurn) : null
+  }
+
+  return {
+    action: 'speak',
+    target: fallbackTarget
+  } satisfies PlannedCollaborativeTurn
+}
+
+const orchestrateCollaborativeConversation = async ({
+  dispatch,
+  getState,
+  topicId,
+  triggeringMessage,
+  assistant,
+  targets: initialTargets
+}: {
+  dispatch: AppDispatch
+  getState: () => RootState
+  topicId: string
+  triggeringMessage: Message
+  assistant: Assistant
+  targets: ConversationResponseTarget[]
+}) => {
+  const topic = getTopicFromState(getState(), topicId)
+  const teamConfig = getTopicTeamConfig(topic)
+  const usedTargetKeys: string[] = []
+  let lastSpeakerKey: string | undefined
+
+  for (let turnIndex = 0; turnIndex < teamConfig.maxTurns; turnIndex++) {
+    const agentRequestCache = new Map<string, Promise<GetAgentResponse>>()
+    const resolveAgent = createConversationAgentResolver(getState, agentRequestCache)
+    const currentTopic = getTopicFromState(getState(), topicId)
+    const currentMessages = selectMessagesForTopic(getState(), topicId)
+    const currentTargets = currentTopic
+      ? buildConversationResponseTargets({
+          assistant,
+          topic: currentTopic
+        })
+      : initialTargets
+
+    if (currentTargets.length === 0) {
+      break
+    }
+
+    const targetCapabilitySummaries = await buildCollaborativeTargetCapabilitySummaries({
+      getState,
+      targets: currentTargets,
+      resolveAgent
+    })
+    const discussionSignals = getCollaborativeDiscussionSignals({
+      messages: currentMessages,
+      targets: currentTargets,
+      maxTurns: teamConfig.maxTurns
+    })
+    const plannedTurn = await planNextCollaborativeTurn({
+      assistant,
+      topic: currentTopic,
+      messages: currentMessages,
+      targets: currentTargets,
+      usedTargetKeys,
+      turnIndex,
+      maxTurns: teamConfig.maxTurns,
+      lastSpeakerKey,
+      targetCapabilitySummaries,
+      discussionSignals
+    })
+
+    if (!plannedTurn || plannedTurn.action === 'finish') {
+      break
+    }
+
+    const previousSpeakerLabel = lastSpeakerKey
+      ? getConversationResponseTargetLabel(
+          currentTargets.find((target) => getConversationResponseTargetKey(target) === lastSpeakerKey) ?? plannedTurn.target
+        )
+      : undefined
+
+    const assistantMessage = createAssistantMessageForTarget({
+      target: plannedTurn.target,
+      topicId,
+      askId: triggeringMessage.id,
+      traceId: triggeringMessage.traceId
+    })
+    await persistConversationMessageStub(dispatch, topicId, assistantMessage)
+
+    await createConversationResponseRunner({
+      dispatch,
+      getState,
+      topicId,
+      triggeringMessage,
+      target: plannedTurn.target,
+      assistantMessage,
+      executionOptions: {
+        prefetchedAgent:
+          plannedTurn.target.kind === 'agent' ? await resolveAgent(plannedTurn.target.agentId).catch(() => undefined) : undefined,
+        turnPrompt: buildSelectedSpeakerPrompt({
+          participantLabel: getConversationResponseTargetLabel(plannedTurn.target),
+          turnIndex,
+          maxTurns: teamConfig.maxTurns,
+          instruction: plannedTurn.instruction,
+          lastSpeakerLabel: previousSpeakerLabel,
+          suggestedVisibleReplyCount: discussionSignals.suggestedVisibleReplyCount
+        })
+      }
+    })()
+
+    lastSpeakerKey = getConversationResponseTargetKey(plannedTurn.target)
+    usedTargetKeys.push(lastSpeakerKey)
+  }
+}
+
+const dispatchConversationResponseTargets = async (
   dispatch: AppDispatch,
   getState: () => RootState,
   topicId: string,
   triggeringMessage: Message, // userMessage or messageToResend
   assistant: Assistant,
-  mentionedModels: Model[]
+  targets: ConversationResponseTarget[]
 ) => {
-  const assistantMessageStubs: Message[] = []
-  const tasksToQueue: { assistantConfig: Assistant; messageStub: Message }[] = []
+  const collaborative = targets.some((target) => !!target.participantId)
 
-  for (const mentionedModel of mentionedModels) {
-    const assistantForThisMention = { ...assistant, model: mentionedModel }
-    const assistantMessage = createAssistantMessage(assistant.id, topicId, {
-      askId: triggeringMessage.id,
-      model: mentionedModel,
-      modelId: mentionedModel.id,
-      traceId: triggeringMessage.traceId
+  if (collaborative) {
+    const queue = getTopicQueue(topicId)
+    await queue.add(async () => {
+      await orchestrateCollaborativeConversation({
+        dispatch,
+        getState,
+        topicId,
+        triggeringMessage,
+        assistant,
+        targets
+      })
     })
-    dispatch(newMessagesActions.addMessage({ topicId, message: assistantMessage }))
-    assistantMessageStubs.push(assistantMessage)
-    tasksToQueue.push({
-      assistantConfig: assistantForThisMention,
-      messageStub: assistantMessage
-    })
+    return
   }
 
-  const topicFromDB = await db.topics.get(topicId)
-  if (topicFromDB) {
-    const currentTopicMessageIds = getState().messages.messageIdsByTopic[topicId] || []
-    const currentEntities = getState().messages.entities
-    const messagesToSaveInDB = currentTopicMessageIds.map((id) => currentEntities[id]).filter((m): m is Message => !!m)
-    await db.topics.update(topicId, { messages: messagesToSaveInDB })
-  } else {
-    logger.error(`[dispatchMultiModelResponses] Topic ${topicId} not found in DB during multi-model save.`)
-    throw new Error(`Topic ${topicId} not found in DB.`)
+  const tasksToQueue: Array<() => Promise<void>> = []
+  for (const target of targets) {
+    const assistantMessage = createAssistantMessageForTarget({
+      target,
+      topicId,
+      askId: triggeringMessage.id,
+      traceId: triggeringMessage.traceId
+    })
+    await persistConversationMessageStub(dispatch, topicId, assistantMessage)
+
+    tasksToQueue.push(
+      createConversationResponseRunner({
+        dispatch,
+        getState,
+        topicId,
+        triggeringMessage,
+        target,
+        assistantMessage
+      })
+    )
   }
 
   const queue = getTopicQueue(topicId)
-  for (const task of tasksToQueue) {
-    void queue.add(async () => {
-      await fetchAndProcessAssistantResponseImpl(dispatch, getState, topicId, task.assistantConfig, task.messageStub)
-    })
+  for (const runner of tasksToQueue) {
+    void queue.add(runner)
   }
 }
 
@@ -835,12 +1613,31 @@ const fetchAndProcessAssistantResponseImpl = async (
   getState: () => RootState,
   topicId: string,
   origAssistant: Assistant,
-  assistantMessage: Message // Pass the prepared assistant message (new or reset)
+  assistantMessage: Message, // Pass the prepared assistant message (new or reset)
+  options?: {
+    extraPrompt?: string
+    forceCollaborativeContext?: boolean
+  }
 ) => {
-  const topic = origAssistant.topics.find((t) => t.id === topicId)
-  const assistant = topic?.prompt
-    ? { ...origAssistant, prompt: `${origAssistant.prompt}\n${topic.prompt}` }
-    : origAssistant
+  const topic = getTopicFromState(getState(), topicId) ?? origAssistant.topics.find((t) => t.id === topicId)
+  const collaborativeConversation =
+    options?.forceCollaborativeContext ?? (isCollaborativeConversationTopic(topic) && !!assistantMessage.participantId)
+  const assistantPrompt = [origAssistant.prompt, topic?.prompt]
+  if (collaborativeConversation) {
+    assistantPrompt.push(
+      buildParticipantDiscussionPrompt({
+        participantLabel: assistantMessage.participantLabel,
+        topic
+      })
+    )
+  }
+  if (options?.extraPrompt) {
+    assistantPrompt.push(options.extraPrompt)
+  }
+  const assistant = {
+    ...origAssistant,
+    prompt: assistantPrompt.filter(Boolean).join('\n\n')
+  }
   const assistantMsgId = assistantMessage.id
   let callbacks: StreamProcessorCallbacks = {}
   try {
@@ -863,6 +1660,7 @@ const fetchAndProcessAssistantResponseImpl = async (
     let messagesForContext: Message[] = []
     const userMessageId = assistantMessage.askId
     const userMessageIndex = allMessagesForTopic.findIndex((m) => m?.id === userMessageId)
+    const assistantMessageIndex = allMessagesForTopic.findIndex((m) => m?.id === assistantMsgId)
 
     if (userMessageIndex === -1) {
       logger.error(
@@ -875,9 +1673,13 @@ const fetchAndProcessAssistantResponseImpl = async (
           : allMessagesForTopic
       ).filter((m) => m && !m.status?.includes('ing'))
     } else {
-      const contextSlice = allMessagesForTopic.slice(0, userMessageIndex + 1)
+      const contextEndIndex =
+        collaborativeConversation && assistantMessageIndex !== -1 ? assistantMessageIndex : userMessageIndex + 1
+      const contextSlice = allMessagesForTopic.slice(0, contextEndIndex)
       messagesForContext = contextSlice.filter((m) => m && !m.status?.includes('ing'))
     }
+
+    messagesForContext = filterMessagesForParticipantContext(messagesForContext, assistantMessage.participantId, topic)
 
     // Ensure at least the triggering user message is present to avoid empty payloads
     if ((!messagesForContext || messagesForContext.length === 0) && userMessageId) {
@@ -932,6 +1734,9 @@ const fetchAndProcessAssistantResponseImpl = async (
         blockManager,
         assistantMsgId,
         callbacks,
+        conversationOptions: {
+          collaborative: collaborativeConversation
+        },
         options: {
           signal: abortController.signal,
           headers: defaultAppHeaders()
@@ -1026,10 +1831,15 @@ export const sendMessage =
           })
         })
       } else {
-        const mentionedModels = userMessage.mentions
+        const topic = getTopicFromState(getState(), topicId)
+        const responseTargets = buildConversationResponseTargets({
+          assistant,
+          topic,
+          mentionedModels: userMessage.mentions
+        })
 
-        if (mentionedModels && mentionedModels.length > 0) {
-          await dispatchMultiModelResponses(dispatch, getState, topicId, userMessage, assistant, mentionedModels)
+        if (responseTargets.length > 0) {
+          await dispatchConversationResponseTargets(dispatch, getState, topicId, userMessage, assistant, responseTargets)
         } else {
           const assistantMessage = createAssistantMessage(assistant.id, topicId, {
             askId: userMessage.id,
@@ -1210,6 +2020,12 @@ export const resendMessageThunk =
   async (dispatch: AppDispatch, getState: () => RootState) => {
     try {
       const state = getState()
+      const topic = getTopicFromState(state, topicId)
+      const responseTargets = buildConversationResponseTargets({
+        assistant,
+        topic,
+        mentionedModels: userMessageToResend.mentions
+      })
       // Use selector to get all messages for the topic
       const allMessagesForTopic = selectMessagesForTopic(state, topicId)
 
@@ -1227,21 +2043,60 @@ export const resendMessageThunk =
         logger.warn(`Failed to clear keyv cache for message ${userMessageToResend.id}:`, error as Error)
       }
 
+      if (isCollaborativeConversationTopic(topic)) {
+        const existingAssistantMessages = allMessagesForTopic.filter(
+          (message) => message.askId === userMessageToResend.id && message.role === 'assistant'
+        )
+        const existingMessageIds = existingAssistantMessages.map((message) => message.id)
+        const existingBlockIds = existingAssistantMessages.flatMap((message) => message.blocks || [])
+
+        if (existingAssistantMessages.length > 0) {
+          dispatch(newMessagesActions.removeMessagesByAskId({ topicId, askId: userMessageToResend.id }))
+          cleanupMultipleBlocks(dispatch, existingBlockIds)
+          await deleteMessagesFromDB(topicId, existingMessageIds)
+        }
+
+        if (responseTargets.length > 0) {
+          await dispatchConversationResponseTargets(
+            dispatch,
+            getState,
+            topicId,
+            userMessageToResend,
+            assistant,
+            responseTargets
+          )
+        }
+
+        return
+      }
+
       const resetDataList: Message[] = []
 
-      if (assistantMessagesToReset.length === 0 && !userMessageToResend?.mentions?.length) {
-        // 没有相关的助手消息且没有提及模型时，使用助手模型创建一条消息
+      if (assistantMessagesToReset.length === 0) {
+        if (responseTargets.length > 0) {
+          for (const target of responseTargets) {
+            const assistantMessage = createAssistantMessageForTarget({
+              target,
+              topicId,
+              askId: userMessageToResend.id,
+              traceId: userMessageToResend.traceId
+            })
+            resetDataList.push(assistantMessage)
+            dispatch(newMessagesActions.addMessage({ topicId, message: assistantMessage }))
+          }
+        } else {
+          // 没有相关的助手消息且没有提及模型时，使用助手模型创建一条消息
+          const assistantMessage = createAssistantMessage(assistant.id, topicId, {
+            askId: userMessageToResend.id,
+            model: assistant.model
+          })
+          assistantMessage.traceId = userMessageToResend.traceId
+          resetDataList.push(assistantMessage)
 
-        const assistantMessage = createAssistantMessage(assistant.id, topicId, {
-          askId: userMessageToResend.id,
-          model: assistant.model
-        })
-        assistantMessage.traceId = userMessageToResend.traceId
-        resetDataList.push(assistantMessage)
-
-        resetDataList.forEach((message) => {
-          dispatch(newMessagesActions.addMessage({ topicId, message }))
-        })
+          resetDataList.forEach((message) => {
+            dispatch(newMessagesActions.addMessage({ topicId, message }))
+          })
+        }
       }
 
       // 处理存在相关的助手消息的情况
@@ -1255,7 +2110,10 @@ export const resendMessageThunk =
       // 先处理已有的重传
       for (const originalMsg of assistantMessagesToReset) {
         const modelToSet =
-          assistantMessagesToReset.length === 1 && !userMessageToResend?.mentions?.length
+          assistantMessagesToReset.length === 1 &&
+          responseTargets.length === 0 &&
+          !userMessageToResend?.mentions?.length &&
+          !originalMsg.participantId
             ? assistant.model
             : originalMsg.model
         const blockIdsToDelete = [...(originalMsg.blocks || [])]
@@ -1275,14 +2133,14 @@ export const resendMessageThunk =
       }
 
       // 再处理新的重传（用户消息提及，但是现有助手消息中不存在提及的模型）
-      const originModelSet = new Set(assistantMessagesToReset.map((m) => m.model).filter((m) => m !== undefined))
-      const mentionedModelSet = new Set(userMessageToResend.mentions ?? [])
-      const newModelSet = new Set([...mentionedModelSet].filter((m) => !originModelSet.has(m)))
-      for (const model of newModelSet) {
-        const assistantMessage = createAssistantMessage(assistant.id, topicId, {
+      const existingTargetKeys = new Set(resetDataList.map(getAssistantMessageMatchKey))
+      const missingTargets = responseTargets.filter((target) => !existingTargetKeys.has(getResponseTargetMatchKey(target)))
+      for (const target of missingTargets) {
+        const assistantMessage = createAssistantMessageForTarget({
+          target,
+          topicId,
           askId: userMessageToResend.id,
-          model: model,
-          modelId: model.id
+          traceId: userMessageToResend.traceId
         })
         resetDataList.push(assistantMessage)
         dispatch(newMessagesActions.addMessage({ topicId, message: assistantMessage }))
@@ -1302,14 +2160,23 @@ export const resendMessageThunk =
       }
 
       const queue = getTopicQueue(topicId)
+      const collaborative = isCollaborativeConversationTopic(topic)
       for (const resetMsg of resetDataList) {
-        const assistantConfigForThisRegen = {
-          ...assistant,
-          ...(resetMsg.model ? { model: resetMsg.model } : {})
-        }
-        void queue.add(async () => {
-          await fetchAndProcessAssistantResponseImpl(dispatch, getState, topicId, assistantConfigForThisRegen, resetMsg)
+        const responseTarget = getResponseTargetForMessage({ message: resetMsg, assistant, topic })
+        const runner = createConversationResponseRunner({
+          dispatch,
+          getState,
+          topicId,
+          triggeringMessage: userMessageToResend,
+          target: responseTarget,
+          assistantMessage: resetMsg
         })
+
+        if (collaborative) {
+          await queue.add(runner)
+        } else {
+          void queue.add(runner)
+        }
       }
     } catch (error) {
       logger.error(`[resendMessageThunk] Error resending user message ${userMessageToResend.id}:`, error as Error)
@@ -1337,6 +2204,7 @@ export const regenerateAssistantResponseThunk =
   async (dispatch: AppDispatch, getState: () => RootState) => {
     try {
       const state = getState()
+      const topic = getTopicFromState(state, topicId)
 
       // 1. Use selector to get all messages for the topic
       const allMessagesForTopic = selectMessagesForTopic(state, topicId)
@@ -1367,6 +2235,11 @@ export const regenerateAssistantResponseThunk =
         logger.error(
           `[regenerateAssistantResponseThunk] Original user query (askId: ${assistantMessageToRegenerate.askId}) not found for assistant message ${assistantMessageToRegenerate.id}. Cannot regenerate.`
         )
+        return
+      }
+
+      if (isCollaborativeConversationTopic(topic)) {
+        await dispatch(resendMessageThunk(topicId, originalUserQuery, assistant))
         return
       }
 
@@ -1425,19 +2298,21 @@ export const regenerateAssistantResponseThunk =
 
       // 8. Add fetch/process call to the queue
       const queue = getTopicQueue(topicId)
-      const assistantConfigForRegen = {
-        ...assistant,
-        ...(resetAssistantMsg.model ? { model: resetAssistantMsg.model } : {})
-      }
-      void queue.add(async () => {
-        await fetchAndProcessAssistantResponseImpl(
+      const responseTarget = getResponseTargetForMessage({
+        message: resetAssistantMsg,
+        assistant,
+        topic
+      })
+      void queue.add(
+        createConversationResponseRunner({
           dispatch,
           getState,
           topicId,
-          assistantConfigForRegen,
-          resetAssistantMsg
-        )
-      })
+          triggeringMessage: originalUserQuery,
+          target: responseTarget,
+          assistantMessage: resetAssistantMsg
+        })
+      )
     } catch (error) {
       logger.error(
         `[regenerateAssistantResponseThunk] Error regenerating response for assistant message ${assistantMessageToRegenerate.id}:`,

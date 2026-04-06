@@ -10,6 +10,7 @@ import HomeTabs from '../Tabs'
 interface ShowParams {
   activeAssistant: Assistant
   setActiveAssistant: (assistant: Assistant) => void
+  setActiveConversation: (assistant: Assistant, topic: Topic) => void
   activeTopic: Topic
   setActiveTopic: (topic: Topic) => void
 }
@@ -21,6 +22,7 @@ interface Props extends ShowParams {
 const PopupContainer: React.FC<Props> = ({
   activeAssistant,
   setActiveAssistant,
+  setActiveConversation,
   activeTopic,
   setActiveTopic,
   resolve
@@ -62,6 +64,10 @@ const PopupContainer: React.FC<Props> = ({
         activeTopic={activeTopic}
         setActiveAssistant={(assistant) => {
           setActiveAssistant(assistant)
+          onClose()
+        }}
+        setActiveConversation={(assistant, topic) => {
+          setActiveConversation(assistant, topic)
           onClose()
         }}
         setActiveTopic={(topic) => {

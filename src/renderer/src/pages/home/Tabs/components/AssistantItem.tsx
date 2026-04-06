@@ -5,12 +5,17 @@ import { useAssistant, useAssistants } from '@renderer/hooks/useAssistant'
 import { useSettings } from '@renderer/hooks/useSettings'
 import { useTags } from '@renderer/hooks/useTags'
 import AssistantSettingsPopup from '@renderer/pages/settings/AssistantSettings'
+import {
+  CONVERSATION_PARTICIPANT_MIME_TYPE,
+  isGroupConversationTopic
+} from '@renderer/services/ConversationParticipantService'
 import { EVENT_NAMES, EventEmitter } from '@renderer/services/EventService'
+import { useAppSelector } from '@renderer/store'
 import type { Assistant, AssistantsSortType } from '@renderer/types'
 import { cn, uuid } from '@renderer/utils'
 import { hasTopicPendingRequests } from '@renderer/utils/queue'
 import type { MenuProps } from 'antd'
-import { Dropdown } from 'antd'
+import { Dropdown, Tooltip } from 'antd'
 import { omit } from 'lodash'
 import {
   AlignJustify,
@@ -65,6 +70,8 @@ const AssistantItem: FC<AssistantItemProps> = ({
   const { removeAllTopics } = useAssistant(assistant.id)
   const { clickAssistantToShowTopic, topicPosition, setAssistantIconType } = useSettings()
   const { assistants, updateAssistants } = useAssistants()
+  const activeTopic = useAppSelector((state) => state.runtime.chat.activeTopic)
+  const canJoinActiveGroup = isGroupConversationTopic(activeTopic ?? undefined)
 
   const [isPending, setIsPending] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
@@ -149,13 +156,43 @@ const AssistantItem: FC<AssistantItemProps> = ({
     e.stopPropagation()
   }, [])
 
+  const handleParticipantDragStart = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      if (!canJoinActiveGroup) {
+        event.preventDefault()
+        return
+      }
+
+      event.stopPropagation()
+      event.dataTransfer.effectAllowed = 'copy'
+      event.dataTransfer.setData(
+        CONVERSATION_PARTICIPANT_MIME_TYPE,
+        JSON.stringify({
+          participantType: 'assistant',
+          assistantId: assistant.id
+        })
+      )
+    },
+    [assistant.id, canJoinActiveGroup]
+  )
+
+  const handleAddParticipantClick = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      event.stopPropagation()
+      void EventEmitter.emit(EVENT_NAMES.ADD_TOPIC_PARTICIPANT, { assistantId: assistant.id })
+    },
+    [assistant.id]
+  )
+
   return (
     <Dropdown
       menu={{ items: menuItems }}
       trigger={['contextMenu']}
       popupRender={(menu) => <div onPointerDown={(e) => e.stopPropagation()}>{menu}</div>}>
       <Container
+        draggable={canJoinActiveGroup}
         onClick={handleSwitch}
+        onDragStart={handleParticipantDragStart}
         isActive={isActive}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}>
@@ -167,6 +204,13 @@ const AssistantItem: FC<AssistantItemProps> = ({
           />
           <AssistantName className="text-nowrap">{assistantName}</AssistantName>
         </AssistantNameRow>
+        {canJoinActiveGroup && (isActive || isHovered) && (
+          <Tooltip title={t('chat.input.participants.assistant_action')}>
+            <ParticipantActionButton onClick={handleAddParticipantClick} onMouseDown={(e) => e.stopPropagation()}>
+              <Plus size={14} className="text-(--color-text-secondary)" />
+            </ParticipantActionButton>
+          </Tooltip>
+        )}
         {(isActive || isHovered) && (
           <Dropdown
             menu={{ items: menuItems }}
@@ -440,6 +484,21 @@ const MenuButton = ({
     {...props}
     className={cn(
       'absolute top-1.5 right-2.25 flex h-5.5 min-h-5.5 min-w-5.5 flex-row items-center justify-center rounded-[11px] border-(--color-border) border-[0.5px] bg-(--color-background) px-1.25',
+      className
+    )}>
+    {children}
+  </div>
+)
+
+const ParticipantActionButton = ({
+  children,
+  className,
+  ...props
+}: PropsWithChildren<{} & React.HTMLAttributes<HTMLDivElement>>) => (
+  <div
+    {...props}
+    className={cn(
+      'absolute top-1.5 right-10 flex h-5.5 min-h-5.5 min-w-5.5 cursor-pointer flex-row items-center justify-center rounded-[11px] border-(--color-border) border-[0.5px] bg-(--color-background) px-1.25',
       className
     )}>
     {children}

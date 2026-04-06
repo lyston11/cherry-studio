@@ -16,6 +16,9 @@ interface ContainerProps {
 
 export const MessagesContainer = styled(Scrollbar)<ContainerProps>`
   display: flex;
+  flex: 1;
+  min-height: 0;
+  height: 0;
   flex-direction: column-reverse;
   overflow-x: hidden;
   z-index: 1;

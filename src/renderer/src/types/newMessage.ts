@@ -197,6 +197,8 @@ export type Message = {
   useful?: boolean
   askId?: string // 关联的问题消息ID
   mentions?: Model[]
+  participantId?: string
+  participantLabel?: string
   /**
    * @deprecated
    */

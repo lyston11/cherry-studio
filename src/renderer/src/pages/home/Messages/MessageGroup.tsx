@@ -50,6 +50,18 @@ const MessageGroup = ({ messages, topic, registerMessageElement }: Props) => {
   )
 
   const isGrid = multiModelMessageStyle === 'grid'
+  const groupDomId = useMemo(() => {
+    const leadMessage = messages[0]
+    if (!leadMessage) {
+      return undefined
+    }
+
+    if (messages.length > 1 && leadMessage.askId) {
+      return `message-group-${leadMessage.askId}`
+    }
+
+    return `message-group-${leadMessage.id}`
+  }, [messages])
 
   const selectedMessageId = useMemo(() => {
     if (messages.length === 1) return messages[0]?.id
@@ -267,7 +279,7 @@ const MessageGroup = ({ messages, topic, registerMessageElement }: Props) => {
   return (
     <MessageEditingProvider>
       <GroupContainer
-        id={messages[0].askId ? `message-group-${messages[0].askId}` : undefined}
+        id={groupDomId}
         className={classNames([multiModelMessageStyle, { 'multi-select-mode': isMultiSelectMode }])}>
         <GridContainer
           $count={messageLength}

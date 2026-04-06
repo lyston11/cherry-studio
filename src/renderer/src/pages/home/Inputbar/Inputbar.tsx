@@ -24,6 +24,7 @@ import {
 } from '@renderer/pages/home/Inputbar/context/InputbarToolsProvider'
 import { getDefaultTopic } from '@renderer/services/AssistantService'
 import { CacheService } from '@renderer/services/CacheService'
+import { buildConversationResponseTargets } from '@renderer/services/ConversationParticipantService'
 import { EVENT_NAMES, EventEmitter } from '@renderer/services/EventService'
 import FileManager from '@renderer/services/FileManager'
 import { checkRateLimit, getUserMessage } from '@renderer/services/MessagesService'
@@ -172,18 +173,38 @@ const InputbarInner: FC<InputbarInnerProps> = ({ assistant: initialAssistant, se
   const { setTimeoutTimer } = useTimer()
   const isMultiSelectMode = useAppSelector((state) => state.runtime.chat.isMultiSelectMode)
 
+  const conversationResponseTargets = useMemo(
+    () =>
+      buildConversationResponseTargets({
+        assistant,
+        topic,
+        mentionedModels
+      }),
+    [assistant, mentionedModels, topic]
+  )
+
+  const responseModels = useMemo(
+    () =>
+      conversationResponseTargets.length > 0
+        ? conversationResponseTargets.map((target) => target.model).filter((current): current is Model => !!current)
+        : assistant.model
+          ? [assistant.model]
+          : [],
+    [assistant.model, conversationResponseTargets]
+  )
+
   const isVisionSupported = useMemo(
     () =>
-      (mentionedModels.length > 0 && isVisionModels(mentionedModels)) ||
-      (mentionedModels.length === 0 && isVisionAssistant),
-    [mentionedModels, isVisionAssistant]
+      (responseModels.length > 0 && isVisionModels(responseModels)) ||
+      (responseModels.length === 0 && isVisionAssistant),
+    [responseModels, isVisionAssistant]
   )
 
   const isGenerateImageSupported = useMemo(
     () =>
-      (mentionedModels.length > 0 && isGenerateImageModels(mentionedModels)) ||
-      (mentionedModels.length === 0 && isGenerateImageAssistant),
-    [mentionedModels, isGenerateImageAssistant]
+      (responseModels.length > 0 && isGenerateImageModels(responseModels)) ||
+      (responseModels.length === 0 && isGenerateImageAssistant),
+    [responseModels, isGenerateImageAssistant]
   )
 
   const canAddImageFile = useMemo(() => {
@@ -241,7 +262,7 @@ const InputbarInner: FC<InputbarInnerProps> = ({ assistant: initialAssistant, se
 
     const parent = spanManagerService.startTrace(
       { topicId: topic.id, name: 'sendMessage', inputs: text },
-      mentionedModels.length > 0 ? mentionedModels : [assistant.model]
+      responseModels
     )
     void EventEmitter.emit(EVENT_NAMES.SEND_MESSAGE, { topicId: topic.id, traceId: parent?.spanContext().traceId })
 
@@ -278,6 +299,7 @@ const InputbarInner: FC<InputbarInnerProps> = ({ assistant: initialAssistant, se
     topic,
     text,
     mentionedModels,
+    responseModels,
     files,
     dispatch,
     setText,
@@ -388,21 +410,6 @@ const InputbarInner: FC<InputbarInnerProps> = ({ assistant: initialAssistant, se
   })
 
   useEffect(() => {
-    const _setEstimateTokenCount = debounce(setEstimateTokenCount, 100, { leading: false, trailing: true })
-    const unsubscribes = [
-      EventEmitter.on(EVENT_NAMES.ESTIMATED_TOKEN_COUNT, ({ tokensCount, contextCount }) => {
-        _setEstimateTokenCount(tokensCount)
-        setContextCount({ current: contextCount.current, max: contextCount.max })
-      }),
-      ...[EventEmitter.on(EVENT_NAMES.ADD_NEW_TOPIC, addNewTopic)]
-    ]
-
-    return () => {
-      unsubscribes.forEach((unsubscribe) => unsubscribe())
-    }
-  }, [addNewTopic])
-
-  useEffect(() => {
     const debouncedEstimate = debounce((value: string) => {
       if (showInputEstimatedTokens) {
         const count = estimateTxtTokens(value) || 0
@@ -425,8 +432,24 @@ const InputbarInner: FC<InputbarInnerProps> = ({ assistant: initialAssistant, se
     assistant.enableWebSearch,
     assistant.webSearchProviderId,
     mentionedModels,
+    topic.participants,
     focusTextarea
   ])
+
+  useEffect(() => {
+    const _setEstimateTokenCount = debounce(setEstimateTokenCount, 100, { leading: false, trailing: true })
+    const unsubscribes = [
+      EventEmitter.on(EVENT_NAMES.ESTIMATED_TOKEN_COUNT, ({ tokensCount, contextCount }) => {
+        _setEstimateTokenCount(tokensCount)
+        setContextCount({ current: contextCount.current, max: contextCount.max })
+      }),
+      EventEmitter.on(EVENT_NAMES.ADD_NEW_TOPIC, addNewTopic)
+    ]
+
+    return () => {
+      unsubscribes.forEach((unsubscribe) => unsubscribe())
+    }
+  }, [addNewTopic])
 
   // TODO: Just use assistant.knowledge_bases as selectedKnowledgeBases. context state is overdesigned.
   useEffect(() => {

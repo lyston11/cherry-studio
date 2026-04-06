@@ -453,6 +453,8 @@ export const resetAssistantMessage = (
     agentSessionId: originalMessage.agentSessionId,
     model: originalMessage.model, // Keep the model information
     modelId: originalMessage.modelId,
+    participantId: originalMessage.participantId,
+    participantLabel: originalMessage.participantLabel,
 
     // --- Reset Response Content & Status ---
     blocks: [], // <<< CRITICAL: Clear the blocks array

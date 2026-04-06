@@ -54,6 +54,7 @@ export async function convertMessageToSdkParam(
     return convertMessageToUserModelMessage(content, fileBlocks, imageBlocks, isVisionModel, model)
   } else {
     return convertMessageToAssistantModelMessage(
+      message,
       content,
       fileBlocks,
       imageBlocks,
@@ -222,6 +223,7 @@ export function stripMarkdownBase64Images(text: string): string {
  * 需要添加占位文本，因为某些 API（如 Gemini）不接受空的 assistant 消息
  */
 async function convertMessageToAssistantModelMessage(
+  message: Message,
   content: string,
   fileBlocks: FileMessageBlock[],
   imageBlocks: ImageMessageBlock[],
@@ -230,6 +232,7 @@ async function convertMessageToAssistantModelMessage(
   model?: Model
 ): Promise<AssistantModelMessage> {
   const parts: Array<TextPart | ReasoningPart | FilePart> = []
+  const speakerPrefix = message.participantLabel ? `[${message.participantLabel}] ` : ''
 
   // Add reasoning blocks first (required by AWS Bedrock for Claude extended thinking)
   for (const thinkingBlock of thinkingBlocks) {
@@ -246,7 +249,7 @@ async function convertMessageToAssistantModelMessage(
     const thoughtSignature = mainTextBlocks.find((block) => block.metadata?.thoughtSignature)?.metadata
       ?.thoughtSignature
 
-    const textPart: TextPart = { type: 'text', text: trimmedContent }
+    const textPart: TextPart = { type: 'text', text: `${speakerPrefix}${trimmedContent}` }
 
     // Add providerOptions with thoughtSignature if available (for Gemini)
     if (thoughtSignature) {
@@ -280,7 +283,7 @@ async function convertMessageToAssistantModelMessage(
   // 当 parts 为空但有图片时，添加占位文本
   // 这对于图片生成模型的继续对话很重要，因为助手消息可能只包含生成的图片
   if (parts.length === 0 && imageBlocks.length > 0) {
-    parts.push({ type: 'text', text: '[Image]' })
+    parts.push({ type: 'text', text: `${speakerPrefix}[Image]` })
   }
 
   return {

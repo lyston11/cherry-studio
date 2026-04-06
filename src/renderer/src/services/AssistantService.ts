@@ -164,11 +164,21 @@ export function getDefaultTopic(assistantId: string): Topic {
   return {
     id: uuid(),
     assistantId,
+    chatMode: 'single',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     name: i18n.t('chat.default.topic.name'),
     messages: [],
     isNameManuallyEdited: false
+  }
+}
+
+export function getDefaultGroupTopic(assistantId: string): Topic {
+  return {
+    ...getDefaultTopic(assistantId),
+    chatMode: 'group',
+    name: i18n.t('chat.default.group_topic.name'),
+    participants: []
   }
 }
 

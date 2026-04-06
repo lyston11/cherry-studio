@@ -1027,6 +1027,9 @@
         "description": "日常对话和快速问答",
         "title": "添加助手"
       },
+      "group": {
+        "title": "新建群聊"
+      },
       "option": {
         "title": "选择添加类型"
       },
@@ -1061,9 +1064,27 @@
     "deeply_thought": "已深度思考（用时 {{seconds}} 秒）",
     "default": {
       "description": "你好，我是默认助手。你可以立刻开始跟我聊天",
+      "group_topic": {
+        "name": "新建群聊"
+      },
       "name": "默认助手",
       "topic": {
         "name": "默认话题"
+      }
+    },
+    "group": {
+      "create": {
+        "empty": "至少选择一个助手后才能创建群聊",
+        "members": "选择群成员",
+        "placeholder": "群聊名称（可选）"
+      },
+      "drop": {
+        "hint": "松开即可把这个助手加入当前群聊"
+      },
+      "members": {
+        "count": "{{count}} 位成员",
+        "empty": "把左侧单聊拖到右侧会话里，就能把它拉进这个群聊",
+        "title": "群成员"
       }
     },
     "history": {
@@ -1106,6 +1127,17 @@
       "pause": "暂停",
       "placeholder": "在这里输入消息，按 {{key}} 发送 - @ 选择模型， / 选择工具",
       "placeholder_without_triggers": "在这里输入消息，按 {{key}} 发送",
+      "participants": {
+        "assistant_action": "拖动整张助手或 Agent 卡片到右侧，或点这里加入当前会话",
+        "empty": "把左侧助手或 Agent 拖到这里，或点旁边的 +",
+        "team": {
+          "strategy": "讨论模式",
+          "selector": "Selector",
+          "round_robin": "轮询",
+          "turns": "轮次",
+          "moderator": "总结者"
+        }
+      },
       "resource_panel": {
         "categories": {
           "agents": "Agents",

@@ -263,9 +263,31 @@ export enum TopicType {
   Session = 'session'
 }
 
+export type ConversationParticipantType = 'assistant' | 'agent'
+export type CollaborativeTeamStrategy = 'round_robin' | 'selector'
+
+export type CollaborativeTeamConfig = {
+  strategy?: CollaborativeTeamStrategy
+  maxTurns?: number
+  moderatorEnabled?: boolean
+}
+
+export type ConversationParticipant = {
+  id: string
+  type?: ConversationParticipantType
+  sourceAssistantId?: string
+  sourceAgentId?: string
+  label: string
+  emoji?: string
+  model?: Model
+  sessionId?: string
+  agentSessionId?: string
+}
+
 export type Topic = {
   id: string
   type?: TopicType
+  chatMode?: 'single' | 'group'
   assistantId: string
   name: string
   createdAt: string
@@ -273,6 +295,8 @@ export type Topic = {
   messages: Message[]
   pinned?: boolean
   prompt?: string
+  participants?: ConversationParticipant[]
+  teamConfig?: CollaborativeTeamConfig
   isNameManuallyEdited?: boolean
 }
 
