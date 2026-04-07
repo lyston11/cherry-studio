@@ -1,8 +1,8 @@
 # Cherry Studio Documentation / 文档
 
-This directory contains the project documentation in multiple languages.
+This directory contains the project documentation in English and Chinese.
 
-本目录包含多语言项目文档。
+本目录包含项目的英文和中文文档。
 
 ---
 
