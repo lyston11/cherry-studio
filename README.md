@@ -24,6 +24,16 @@ Cherry Studio Group Chat Edition is a desktop client focused on multi-agent grou
 
 ![](https://github.com/user-attachments/assets/58e0237c-4d36-40de-b428-53051d982026)
 
+# 🧠 Group Chat Architecture
+
+This edition adopts an AutoGen-inspired multi-agent orchestration design, built around a chatroom-style conversation flow instead of side-by-side model panels.
+
+- **Hidden lead orchestrator by default**: Every group topic contains an internal coordinator that does not appear in the visible transcript. It decides who should speak next, whether the discussion should continue, and when the group should converge on a final answer.
+- **Selector-style team discussion**: Participants share the same conversation context and visible message stream. The orchestrator can schedule several short turns so different agents add distinct viewpoints, challenge each other, bring tool results, and then close naturally.
+- **Group chat UX instead of parallel panels**: Single-agent chats keep the original Cherry Studio behavior, while group chats switch to an avatar-based message timeline that feels closer to WeChat or QQ group conversations.
+- **Mixed assistants and agents in one room**: A group can include regular assistants and agent participants together. New participants can be selected when creating the group and later added into the same discussion flow.
+- **Capability-aware collaboration**: The planner considers each participant's model profile, tool access, and MCP-related capabilities when deciding who should answer or act next.
+
 # 🌟 Key Features
 
 1. **Diverse LLM Provider Support**:
