@@ -530,7 +530,9 @@ class FileStorage {
         return fs.readFileSync(filePath, 'utf-8')
       }
     } catch (error) {
-      logger.error('Failed to read text file:', error as Error)
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        logger.error('Failed to read text file:', error as Error)
+      }
       throw new Error(`Failed to read file: ${filePath}.`)
     }
   }
@@ -573,6 +575,13 @@ class FileStorage {
     detectEncoding: boolean = false
   ): Promise<string> => {
     const filePath = path.join(this.storageDir, id)
+
+    if (id === 'custom-minapps.json' && !fs.existsSync(filePath)) {
+      fs.mkdirSync(path.dirname(filePath), { recursive: true })
+      fs.writeFileSync(filePath, '[]', 'utf-8')
+      return '[]'
+    }
+
     return this.readFileCore(filePath, detectEncoding)
   }
 

@@ -1,12 +1,6 @@
 import { getModel } from '@renderer/hooks/useModel'
 import type { AgentEntity } from '@renderer/types'
-import type {
-  Assistant,
-  ConversationParticipant,
-  ConversationParticipantType,
-  Model,
-  Topic
-} from '@renderer/types'
+import type { Assistant, ConversationParticipant, ConversationParticipantType, Model, Topic } from '@renderer/types'
 import type { Message } from '@renderer/types/newMessage'
 import { getMainTextContent } from '@renderer/utils/messageUtils/find'
 
@@ -56,7 +50,9 @@ export function hasConversationParticipantDragType(dataTransfer: DataTransfer | 
   return Array.from(dataTransfer.types || []).includes(CONVERSATION_PARTICIPANT_MIME_TYPE)
 }
 
-export function parseConversationParticipantDragPayload(raw: string | null | undefined): ConversationParticipantDragPayload | null {
+export function parseConversationParticipantDragPayload(
+  raw: string | null | undefined
+): ConversationParticipantDragPayload | null {
   if (!raw) {
     return null
   }
@@ -80,7 +76,9 @@ export function parseConversationParticipantDragPayload(raw: string | null | und
   }
 }
 
-export function getConversationParticipantType(participant: ConversationParticipant | undefined): ConversationParticipantType {
+export function getConversationParticipantType(
+  participant: ConversationParticipant | undefined
+): ConversationParticipantType {
   return participant?.type === 'agent' || !!participant?.sourceAgentId ? 'agent' : 'assistant'
 }
 
@@ -200,7 +198,10 @@ export function removeTopicParticipant(topic: Topic, participantId: string): Top
   }
 }
 
-export function resolveAssistantForParticipant(participant: ConversationParticipant, fallbackAssistant: Assistant): Assistant {
+export function resolveAssistantForParticipant(
+  participant: ConversationParticipant,
+  fallbackAssistant: Assistant
+): Assistant {
   if (isAgentConversationParticipant(participant)) {
     return {
       ...fallbackAssistant,
@@ -233,19 +234,17 @@ export function buildConversationResponseTargets({
         return result
       }
 
-      result.push(
-        {
-          kind: 'agent',
-          key: `participant:${participant.id}`,
-          agentId: participant.sourceAgentId,
-          sessionId: participant.sessionId,
-          agentSessionId: participant.agentSessionId,
-          participantId: participant.id,
-          participantLabel: participant.label,
-          participantType: 'agent',
-          model: participant.model
-        }
-      )
+      result.push({
+        kind: 'agent',
+        key: `participant:${participant.id}`,
+        agentId: participant.sourceAgentId,
+        sessionId: participant.sessionId,
+        agentSessionId: participant.agentSessionId,
+        participantId: participant.id,
+        participantLabel: participant.label,
+        participantType: 'agent',
+        model: participant.model
+      })
 
       return result
     }
@@ -255,17 +254,15 @@ export function buildConversationResponseTargets({
       return result
     }
 
-    result.push(
-      {
-        kind: 'assistant',
-        key: `participant:${participant.id}`,
-        model,
-        assistantConfig: resolveAssistantForParticipant(participant, assistant),
-        participantId: participant.id,
-        participantLabel: participant.label,
-        participantType: 'assistant'
-      }
-    )
+    result.push({
+      kind: 'assistant',
+      key: `participant:${participant.id}`,
+      model,
+      assistantConfig: resolveAssistantForParticipant(participant, assistant),
+      participantId: participant.id,
+      participantLabel: participant.label,
+      participantType: 'assistant'
+    })
 
     return result
   }, [])

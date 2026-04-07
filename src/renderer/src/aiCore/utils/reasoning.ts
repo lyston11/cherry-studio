@@ -47,9 +47,12 @@ import type { OpenAIReasoningEffort, OpenAIReasoningSummary } from '@renderer/ty
 import { getLowerBaseModelName } from '@renderer/utils'
 import { isSupportEnableThinkingProvider } from '@renderer/utils/provider'
 import { toInteger } from 'lodash'
-import type { OllamaProviderOptions } from 'ollama-ai-provider-v2'
 
 const logger = loggerService.withContext('reasoning')
+
+export type OllamaReasoningParams = {
+  think?: boolean | 'low' | 'medium' | 'high'
+}
 
 type ReasoningEffortOptionalParams = {
   thinking?: { type: 'disabled' | 'enabled' | 'auto'; budget_tokens?: number }
@@ -929,7 +932,7 @@ export function getBedrockReasoningParams(
  * - GPT-OSS models: accept 'low' | 'medium' | 'high' string values
  * - Other models: boolean only (true/false)
  */
-export function getOllamaReasoningParams(assistant: Assistant, model: Model): Pick<OllamaProviderOptions, 'think'> {
+export function getOllamaReasoningParams(assistant: Assistant, model: Model): OllamaReasoningParams {
   const reasoningEffort = assistant.settings?.reasoning_effort
 
   if (isOpenAIOpenWeightModel(model)) {

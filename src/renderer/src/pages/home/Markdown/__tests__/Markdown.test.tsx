@@ -83,7 +83,13 @@ vi.mock('../Table', () => ({
   __esModule: true,
   default: ({ children, blockId }: any) => (
     <div data-testid="table-component" data-block-id={blockId}>
-      <table>{children}</table>
+      <table>
+        <tbody>
+          <tr>
+            <td>{children}</td>
+          </tr>
+        </tbody>
+      </table>
       <button type="button" data-testid="copy-table-button">
         Copy Table
       </button>

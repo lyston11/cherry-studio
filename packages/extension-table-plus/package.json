@@ -80,8 +80,8 @@
     "directory": "packages/extension-table-plus"
   },
   "scripts": {
-    "build": "tsdown",
-    "lint": "biome format ./src/ --write && eslint --fix ./src/",
+    "build": "node ../../scripts/run-package-bin.mjs tsdown",
+    "lint": "node ../../scripts/run-package-bin.mjs @biomejs/biome format ./src/ --write && node ../../scripts/run-package-bin.mjs eslint --fix ./src/",
     "prepublishOnly": "pnpm build"
   },
   "packageManager": "pnpm@10.27.0"

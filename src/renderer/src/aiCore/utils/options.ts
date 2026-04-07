@@ -40,7 +40,6 @@ import { isSupportServiceTierProvider, isSupportVerbosityProvider } from '@rende
 import type { JSONValue } from 'ai'
 import { t } from 'i18next'
 import { merge } from 'lodash'
-import type { OllamaProviderOptions } from 'ollama-ai-provider-v2'
 
 import { addAnthropicHeaders } from '../prepareParams/header'
 import { getAiSdkProviderId } from '../provider/factory'
@@ -54,7 +53,8 @@ import {
   getOllamaReasoningParams,
   getOpenAIReasoningParams,
   getReasoningEffort,
-  getXAIReasoningParams
+  getXAIReasoningParams,
+  type OllamaReasoningParams
 } from './reasoning'
 import { getWebSearchParams } from './websearch'
 
@@ -518,7 +518,7 @@ function buildOllamaProviderOptions(
   assistant: Assistant,
   model: Model,
   capabilities: Pick<ProviderCapabilities, 'enableReasoning' | 'enableWebSearch' | 'enableGenerateImage'>
-): Record<string, OllamaProviderOptions> {
+): Record<string, OllamaReasoningParams> {
   const { enableReasoning } = capabilities
   let options = {}
 

@@ -42,8 +42,8 @@ const TopicContent = ({
             <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-(--color-primary-soft) text-(--color-primary)">
               <Users size={15} />
             </div>
-            <span className="truncate text-xs font-medium">{topic.name}</span>
-            <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-(--color-background-mute) px-1.5 text-[10px] text-(--color-text-secondary)">
+            <span className="truncate font-medium text-xs">{topic.name}</span>
+            <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-(--color-background-mute) px-1.5 text-(--color-text-secondary) text-[10px]">
               {participantCount}
             </span>
           </div>

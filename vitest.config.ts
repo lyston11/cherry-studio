@@ -12,7 +12,6 @@ export default defineConfig({
       // 主进程单元测试配置
       {
         extends: true,
-        plugins: mainConfig.plugins,
         resolve: {
           alias: mainConfig.resolve.alias
         },
@@ -29,7 +28,6 @@ export default defineConfig({
       // 渲染进程单元测试配置
       {
         extends: true,
-        plugins: rendererConfig.plugins.filter((plugin: any) => plugin.name !== 'tailwindcss'),
         resolve: {
           alias: rendererConfig.resolve.alias
         },

@@ -209,12 +209,24 @@ class MemoryService {
 
       const memoryConfig = selectMemoryConfig(store.getState())
       const embeddingModel = memoryConfig.embeddingModel
+      const resolvedEmbeddingModel =
+        embeddingModel?.id && embeddingModel?.provider
+          ? getModel(embeddingModel.id, embeddingModel.provider)
+          : undefined
+
+      if (!resolvedEmbeddingModel?.id || !resolvedEmbeddingModel?.provider) {
+        return window.api.memory.setConfig({
+          ...memoryConfig,
+          embeddingModel: resolvedEmbeddingModel,
+          embeddingApiClient: undefined
+        })
+      }
 
       // Get knowledge base params for memory
       const { embedApiClient: embeddingApiClient } = getKnowledgeBaseParams({
         id: 'memory',
         name: 'Memory',
-        model: getModel(embeddingModel?.id, embeddingModel?.provider),
+        model: resolvedEmbeddingModel,
         dimensions: memoryConfig.embeddingDimensions,
         items: [],
         created_at: now(),
@@ -224,6 +236,7 @@ class MemoryService {
 
       return window.api.memory.setConfig({
         ...memoryConfig,
+        embeddingModel: resolvedEmbeddingModel,
         embeddingApiClient
       })
     } catch (error) {

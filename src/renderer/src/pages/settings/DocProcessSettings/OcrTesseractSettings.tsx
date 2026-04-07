@@ -41,7 +41,7 @@ export const OcrTesseractSettings = () => {
     () =>
       Object.entries(langs)
         .filter(([, enabled]) => enabled)
-        .map(([lang]) => lang) as TesseractLangCode[],
+        .map(([lang]) => lang),
     [langs]
   )
 

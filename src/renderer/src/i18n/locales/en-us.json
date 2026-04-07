@@ -1123,21 +1123,21 @@
       },
       "new_session": "New Session {{Command}}",
       "new_topic": "New Topic {{Command}}",
-      "paste_text_file_confirm": "Paste into input bar?",
-      "pause": "Pause",
-      "placeholder": "Type your message here, press {{key}} to send - @ to Select Model, / to Include Tools",
-      "placeholder_without_triggers": "Type your message here, press {{key}} to send",
       "participants": {
         "assistant_action": "Drag the whole assistant or agent card into the area on the right, or click here to add it to the current chat",
         "empty": "Drag assistants or agents from the left into this area, or click the + button beside one",
         "team": {
-          "strategy": "Discussion Mode",
-          "selector": "Selector",
+          "moderator": "Moderator",
           "round_robin": "Round Robin",
-          "turns": "Turns",
-          "moderator": "Moderator"
+          "selector": "Selector",
+          "strategy": "Discussion Mode",
+          "turns": "Turns"
         }
       },
+      "paste_text_file_confirm": "Paste into input bar?",
+      "pause": "Pause",
+      "placeholder": "Type your message here, press {{key}} to send - @ to Select Model, / to Include Tools",
+      "placeholder_without_triggers": "Type your message here, press {{key}} to send",
       "resource_panel": {
         "categories": {
           "agents": "Agents",

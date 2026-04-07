@@ -27,9 +27,9 @@ vi.mock('lucide-react', () => ({
 
 // Mock antd components
 vi.mock('antd', () => ({
-  Modal: ({ children, open, footer, ...props }: any) =>
+  Modal: ({ children, open, footer }: any) =>
     open ? (
-      <div data-testid="modal" {...props}>
+      <div data-testid="modal">
         <div data-testid="modal-body">{children}</div>
         {footer && <div data-testid="modal-footer">{footer}</div>}
       </div>

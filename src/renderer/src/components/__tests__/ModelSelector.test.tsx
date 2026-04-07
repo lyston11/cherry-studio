@@ -23,6 +23,12 @@ vi.mock('@renderer/utils/naming', () => ({
   getFancyProviderName: (provider: any) => provider.name
 }))
 
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => key
+  })
+}))
+
 // Import after mocking
 import type { Provider } from '@renderer/types'
 

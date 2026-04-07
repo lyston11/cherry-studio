@@ -368,7 +368,7 @@ const Chat: FC<Props> = (props) => {
                 position="left"
               />
               <div
-                className="flex flex-1 min-h-0 flex-col"
+                className="flex min-h-0 flex-1 flex-col"
                 style={{ height: `calc(${mainHeight} - var(--navbar-height))` }}>
                 <GroupChatFrame
                   $isActiveDropTarget={isGroupTopic && isDraggingParticipant}
@@ -460,8 +460,7 @@ const GroupChatFrame = styled.div<{ $isActiveDropTarget: boolean }>`
   transition:
     box-shadow 0.2s ease,
     background 0.2s ease;
-  box-shadow: ${({ $isActiveDropTarget }) =>
-    $isActiveDropTarget ? 'inset 0 0 0 1px var(--color-primary)' : 'none'};
+  box-shadow: ${({ $isActiveDropTarget }) => ($isActiveDropTarget ? 'inset 0 0 0 1px var(--color-primary)' : 'none')};
   background: ${({ $isActiveDropTarget }) =>
     $isActiveDropTarget ? 'color-mix(in srgb, var(--color-primary) 7%, transparent)' : 'transparent'};
 `

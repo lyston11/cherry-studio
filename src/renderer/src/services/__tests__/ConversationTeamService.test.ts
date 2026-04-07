@@ -63,7 +63,9 @@ const agentTarget = {
   agentId: 'agent-1'
 }
 
-const createMessage = (overrides: Partial<Message> & { __mockContent?: string } = {}): Message & { __mockContent?: string } => ({
+const createMessage = (
+  overrides: Partial<Message> & { __mockContent?: string } = {}
+): Message & { __mockContent?: string } => ({
   id: overrides.id ?? 'message-1',
   role: overrides.role ?? 'assistant',
   assistantId: overrides.assistantId ?? 'assistant-1',

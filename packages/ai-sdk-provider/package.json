@@ -20,11 +20,11 @@
   "types": "dist/index.d.mts",
   "files": ["dist"],
   "scripts": {
-    "build": "tsdown",
-    "dev": "tsc -w",
+    "build": "node ../../scripts/run-package-bin.mjs tsdown",
+    "dev": "node ../../scripts/run-package-bin.mjs typescript --bin=tsc -w",
     "clean": "rm -rf dist",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "node ../../scripts/run-package-bin.mjs vitest run",
+    "test:watch": "node ../../scripts/run-package-bin.mjs vitest",
     "prepublishOnly": "pnpm build"
   },
   "peerDependencies": {

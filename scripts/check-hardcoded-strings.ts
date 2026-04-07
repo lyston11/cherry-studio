@@ -6,6 +6,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import type { SourceFile } from 'ts-morph'
 import { Node, Project } from 'ts-morph'
+import { fileURLToPath } from 'url'
 
 const RENDERER_DIR = path.join(__dirname, '../src/renderer/src')
 const MAIN_DIR = path.join(__dirname, '../src/main')
@@ -461,4 +462,9 @@ export {
   UI_PROPERTIES
 }
 
-main()
+const isDirectExecution =
+  typeof process.argv[1] === 'string' && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+
+if (isDirectExecution) {
+  main()
+}

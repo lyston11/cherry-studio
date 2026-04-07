@@ -64,9 +64,15 @@
  <a href="https://www.producthunt.com/posts/cherry-studio?embed=true&utm_source=badge-featured&utm_medium=badge&utm_souce=badge-cherry&#0045;studio" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=496640&theme=light" alt="Cherry&#0032;Studio - AI&#0032;Chatbots&#0044;&#0032;AI&#0032;Desktop&#0032;Client | Product Hunt" width="220" height="55" /></a>
 </div>
 
-# 🍒 Cherry Studio
+# 🍒 Cherry Studio 群聊版
 
-Cherry Studio 是一款支持多个大语言模型（LLM）服务商的桌面客户端，兼容 Windows、Mac 和 Linux 系统。
+> 基于 [CherryHQ/cherry-studio](https://github.com/CherryHQ/cherry-studio) 的非官方 fork，主要面向群聊场景进行适配和扩展。
+>
+> 本仓库包含对上游项目的修改，并继续按照 `AGPL-3.0` 许可证发布。原项目版权声明与许可证文本均保留在 [LICENSE](../../LICENSE)。
+>
+> 修改声明：本 fork 已在上游项目基础上进行修改，当前说明更新日期为 2026-04-07。
+
+Cherry Studio 群聊版是一款支持多个大语言模型（LLM）服务商的桌面客户端，兼容 Windows、Mac 和 Linux 系统。
 
 👏 欢迎加入 [Telegram 群组](https://t.me/CherryStudioAI)｜[Discord](https://discord.gg/wez8HtpxqQ) | [QQ群(575014769)](https://qm.qq.com/q/lo0D4qVZKi)
 

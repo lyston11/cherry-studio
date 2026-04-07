@@ -1027,6 +1027,9 @@
         "description": "Conversaciones diarias y preguntas y respuestas rápidas",
         "title": "Agregar asistente"
       },
+      "group": {
+        "title": "[to be translated]:New Group Chat"
+      },
       "option": {
         "title": "Seleccionar Tipo"
       },
@@ -1061,9 +1064,27 @@
     "deeply_thought": "Profundamente pensado (tomó {{seconds}} segundos)",
     "default": {
       "description": "Hola, soy el asistente predeterminado. Puedes comenzar a conversar conmigo de inmediato.",
+      "group_topic": {
+        "name": "[to be translated]:New Group Chat"
+      },
       "name": "Asistente predeterminado",
       "topic": {
         "name": "Tema predeterminado"
+      }
+    },
+    "group": {
+      "create": {
+        "empty": "[to be translated]:Select at least one assistant before creating a group chat.",
+        "members": "[to be translated]:Choose members",
+        "placeholder": "[to be translated]:Group chat name (optional)"
+      },
+      "drop": {
+        "hint": "[to be translated]:Drop here to add this assistant to the current group chat"
+      },
+      "members": {
+        "count": "[to be translated]:{{count}} members",
+        "empty": "[to be translated]:Drag a single chat from the left into this conversation to add it to the group",
+        "title": "[to be translated]:Members"
       }
     },
     "history": {
@@ -1102,6 +1123,17 @@
       },
       "new_session": "Nueva Sesión {{Command}}",
       "new_topic": "Nuevo tema {{Command}}",
+      "participants": {
+        "assistant_action": "[to be translated]:Drag the whole assistant or agent card into the area on the right, or click here to add it to the current chat",
+        "empty": "[to be translated]:Drag assistants or agents from the left into this area, or click the + button beside one",
+        "team": {
+          "moderator": "[to be translated]:Moderator",
+          "round_robin": "[to be translated]:Round Robin",
+          "selector": "[to be translated]:Selector",
+          "strategy": "[to be translated]:Discussion Mode",
+          "turns": "[to be translated]:Turns"
+        }
+      },
       "paste_text_file_confirm": "¿Pegar en el cuadro de entrada?",
       "pause": "Pausar",
       "placeholder": "Escribe aquí tu mensaje...",

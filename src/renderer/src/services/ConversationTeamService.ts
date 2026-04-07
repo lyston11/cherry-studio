@@ -52,7 +52,11 @@ function getCandidateLines(
   return targets.map((target) => {
     const key = getConversationResponseTargetKey(target)
     const capabilitySummary = targetCapabilitySummaries?.[key]
-    return ['- id: ' + key, `  name: ${getConversationResponseTargetLabel(target)}`, capabilitySummary ? `  capabilities: ${capabilitySummary}` : '']
+    return [
+      '- id: ' + key,
+      `  name: ${getConversationResponseTargetLabel(target)}`,
+      capabilitySummary ? `  capabilities: ${capabilitySummary}` : ''
+    ]
       .filter(Boolean)
       .join('\n')
   })
@@ -341,13 +345,7 @@ export function buildSelectedSpeakerPrompt({
   ].join('\n')
 }
 
-export function buildModeratorPrompt({
-  topic,
-  targets
-}: {
-  topic?: Topic
-  targets: ConversationResponseTarget[]
-}) {
+export function buildModeratorPrompt({ topic, targets }: { topic?: Topic; targets: ConversationResponseTarget[] }) {
   const roster = targets.map(getConversationResponseTargetLabel).join(', ')
   const teamPrompt = topic?.prompt ? `Topic guidance:\n${topic.prompt}` : ''
 
@@ -362,7 +360,10 @@ export function buildModeratorPrompt({
     .join('\n\n')
 }
 
-export function parseCollaborativeTurnPlan(raw: string, targets: ConversationResponseTarget[]): CollaborativeTurnPlan | null {
+export function parseCollaborativeTurnPlan(
+  raw: string,
+  targets: ConversationResponseTarget[]
+): CollaborativeTurnPlan | null {
   const trimmed = raw.trim()
   if (!trimmed) {
     return null
@@ -411,7 +412,9 @@ export function parseSelectedTargetKey(raw: string, targets: ConversationRespons
     return getConversationResponseTargetKey(byKey)
   }
 
-  const byLabel = targets.find((target) => getConversationResponseTargetLabel(target).toLowerCase() === normalized.toLowerCase())
+  const byLabel = targets.find(
+    (target) => getConversationResponseTargetLabel(target).toLowerCase() === normalized.toLowerCase()
+  )
   if (byLabel) {
     return getConversationResponseTargetKey(byLabel)
   }
@@ -451,7 +454,9 @@ export function selectNextResponseTargetFallback({
       ? targets.filter((target) => getConversationResponseTargetKey(target) !== lastSpeakerKey)
       : targets
 
-  const freshTargets = filteredTargets.filter((target) => !usedTargetKeys.includes(getConversationResponseTargetKey(target)))
+  const freshTargets = filteredTargets.filter(
+    (target) => !usedTargetKeys.includes(getConversationResponseTargetKey(target))
+  )
   const candidateTargets = freshTargets.length > 0 ? freshTargets : filteredTargets
 
   const latestText = [...messages]

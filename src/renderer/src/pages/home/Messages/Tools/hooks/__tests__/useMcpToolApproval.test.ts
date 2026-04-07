@@ -63,6 +63,12 @@ vi.mock('@renderer/i18n', () => ({
   default: { t: vi.fn((key: string) => key) }
 }))
 
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, fallback?: string) => fallback ?? key
+  })
+}))
+
 vi.mock('@renderer/services/SpanManagerService', () => ({
   currentSpan: vi.fn()
 }))

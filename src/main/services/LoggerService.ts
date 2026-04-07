@@ -3,6 +3,7 @@ import type { LogContextData, LogLevel, LogSourceWithContext } from '@shared/con
 import { LEVEL, LEVEL_MAP } from '@shared/config/logger'
 import { IpcChannel } from '@shared/IpcChannel'
 import { app, ipcMain } from 'electron'
+import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import winston from 'winston'
@@ -61,6 +62,22 @@ class LoggerService {
   private module: string = ''
   private context: Record<string, any> = {}
 
+  private createFileTransport(
+    createRotateTransport: () => winston.transport,
+    fallbackOptions: ConstructorParameters<typeof winston.transports.File>[0],
+    transportName: string
+  ): winston.transport {
+    try {
+      return createRotateTransport()
+    } catch (error) {
+      console.warn(
+        `[LoggerService] Failed to initialize ${transportName}, falling back to winston File transport.`,
+        error
+      )
+      return new winston.transports.File(fallbackOptions)
+    }
+  }
+
   private constructor() {
     if (!isMainThread) {
       throw new Error('[LoggerService] NOT support worker thread yet, can only be instantiated in main process.')
@@ -68,6 +85,7 @@ class LoggerService {
 
     // Create logs directory path
     this.logsDir = path.join(app.getPath('userData'), 'logs')
+    fs.mkdirSync(this.logsDir, { recursive: true })
 
     // env variables, only used in dev mode
     // only affect console output, not affect file output
@@ -102,23 +120,42 @@ class LoggerService {
 
     // Daily rotate file transport for general logs
     transports.push(
-      new DailyRotateFile({
-        filename: path.join(this.logsDir, 'app.%DATE%.log'),
-        datePattern: 'YYYY-MM-DD',
-        maxSize: '10m',
-        maxFiles: '30d'
-      })
+      this.createFileTransport(
+        () =>
+          new DailyRotateFile({
+            filename: path.join(this.logsDir, 'app.%DATE%.log'),
+            datePattern: 'YYYY-MM-DD',
+            maxSize: '10m',
+            maxFiles: '30d'
+          }),
+        {
+          filename: path.join(this.logsDir, 'app.log'),
+          maxsize: 10 * 1024 * 1024,
+          maxFiles: 30
+        },
+        'general rotating log transport'
+      )
     )
 
     // Daily rotate file transport for error logs
     transports.push(
-      new DailyRotateFile({
-        level: 'warn',
-        filename: path.join(this.logsDir, 'app-error.%DATE%.log'),
-        datePattern: 'YYYY-MM-DD',
-        maxSize: '10m',
-        maxFiles: '60d'
-      })
+      this.createFileTransport(
+        () =>
+          new DailyRotateFile({
+            level: 'warn',
+            filename: path.join(this.logsDir, 'app-error.%DATE%.log'),
+            datePattern: 'YYYY-MM-DD',
+            maxSize: '10m',
+            maxFiles: '60d'
+          }),
+        {
+          level: 'warn',
+          filename: path.join(this.logsDir, 'app-error.log'),
+          maxsize: 10 * 1024 * 1024,
+          maxFiles: 60
+        },
+        'error rotating log transport'
+      )
     )
 
     // Configure Winston logger

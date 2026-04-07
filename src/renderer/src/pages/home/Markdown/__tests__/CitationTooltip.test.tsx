@@ -1,3 +1,4 @@
+import type * as ReactQueryModule from '@tanstack/react-query'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -14,19 +15,26 @@ vi.mock('@renderer/utils/fetch', () => ({
   isXPostUrl: vi.fn().mockReturnValue(false)
 }))
 
+vi.mock('@tanstack/react-query', async () => {
+  const actual = await vi.importActual<typeof ReactQueryModule>('@tanstack/react-query')
+  return {
+    ...actual,
+    useQuery: vi.fn(() => ({ data: null }))
+  }
+})
+
 vi.mock('@renderer/components/Icons/FallbackFavicon', () => ({
   __esModule: true,
   default: (props: any) => <div data-testid="mock-favicon" {...props} />
 }))
 
 vi.mock('antd', () => ({
-  Tooltip: ({ children, overlay, title, placement, color, styles, ...props }: any) => (
+  Tooltip: ({ children, overlay, title, placement, color, styles }: any) => (
     <div
       data-testid="tooltip-wrapper"
       data-placement={placement}
       data-color={color}
-      data-styles={JSON.stringify(styles)}
-      {...props}>
+      data-styles={JSON.stringify(styles)}>
       {children}
       <div data-testid="tooltip-content">{overlay || title}</div>
     </div>

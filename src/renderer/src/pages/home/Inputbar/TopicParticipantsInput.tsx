@@ -31,7 +31,11 @@ const TopicParticipantsInput: FC<Props> = ({
   const renderParticipantAvatar = (participant: ConversationParticipant, size: number) => {
     if (participant.emoji) {
       if (isEmoji(participant.emoji)) {
-        return <EmojiAvatar size={size} fontSize={size * 0.52}>{participant.emoji}</EmojiAvatar>
+        return (
+          <EmojiAvatar size={size} fontSize={size * 0.52}>
+            {participant.emoji}
+          </EmojiAvatar>
+        )
       }
 
       return (
@@ -151,7 +155,9 @@ const TopicParticipantsInput: FC<Props> = ({
                       {participant.model?.name && <HoverMeta>{participant.model.name}</HoverMeta>}
                     </HoverCard>
                   }>
-                  <ParticipantAvatarButton type="button">{renderParticipantAvatar(participant, 24)}</ParticipantAvatarButton>
+                  <ParticipantAvatarButton type="button">
+                    {renderParticipantAvatar(participant, 24)}
+                  </ParticipantAvatarButton>
                 </Popover>
               )
             })}
@@ -195,7 +201,9 @@ const TopicParticipantsInput: FC<Props> = ({
                   color="#13a8a8"
                   closable
                   onClose={() => onRemoveParticipant(participant.id)}>
-                  {participant.emoji && isEmoji(participant.emoji) ? `${participant.emoji} ${participant.label}` : participant.label}
+                  {participant.emoji && isEmoji(participant.emoji)
+                    ? `${participant.emoji} ${participant.label}`
+                    : participant.label}
                 </CustomTag>
               ))}
             </HorizontalScrollContainer>

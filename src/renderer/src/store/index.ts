@@ -127,11 +127,13 @@ export type AppDispatch = typeof store.dispatch
 export const persistor = persistStore(store, undefined, () => {
   // Initialize notes path after rehydration if empty
   const state = store.getState()
-  if (!state.note.notesPath) {
+  const getAppInfo = window.api?.getAppInfo
+
+  if (!state.note.notesPath && typeof getAppInfo === 'function') {
     // Use setTimeout to ensure this runs after the store is fully initialized
     setTimeout(async () => {
       try {
-        const info = await window.api.getAppInfo()
+        const info = await getAppInfo()
         store.dispatch(setNotesPath(info.notesPath))
         logger.info('Initialized notes path on startup:', info.notesPath)
       } catch (error) {

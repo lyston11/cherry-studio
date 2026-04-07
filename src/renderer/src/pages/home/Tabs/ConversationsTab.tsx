@@ -192,7 +192,9 @@ const ConversationsTab: FC<Props> = ({ activeAssistant, activeTopic, setActiveCo
               onClick={() => setActiveConversation(conversation.assistant, conversation.topic)}
               onDragStart={handleDragStart}
               onMouseEnter={() => setHoveredConversationId(conversation.key)}
-              onMouseLeave={() => setHoveredConversationId((current) => (current === conversation.key ? null : current))}>
+              onMouseLeave={() =>
+                setHoveredConversationId((current) => (current === conversation.key ? null : current))
+              }>
               <ConversationAvatar>
                 {conversation.isGroup ? (
                   <GroupAvatar>

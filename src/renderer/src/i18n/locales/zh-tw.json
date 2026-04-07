@@ -1027,6 +1027,9 @@
         "description": "日常對話和快速問答",
         "title": "新增助手"
       },
+      "group": {
+        "title": "[to be translated]:New Group Chat"
+      },
       "option": {
         "title": "選擇新增類型"
       },
@@ -1061,9 +1064,27 @@
     "deeply_thought": "已深度思考（用時 {{seconds}} 秒）",
     "default": {
       "description": "你好，我是預設助手。你可以立即開始與我聊天",
+      "group_topic": {
+        "name": "[to be translated]:New Group Chat"
+      },
       "name": "預設助手",
       "topic": {
         "name": "預設話題"
+      }
+    },
+    "group": {
+      "create": {
+        "empty": "[to be translated]:Select at least one assistant before creating a group chat.",
+        "members": "[to be translated]:Choose members",
+        "placeholder": "[to be translated]:Group chat name (optional)"
+      },
+      "drop": {
+        "hint": "[to be translated]:Drop here to add this assistant to the current group chat"
+      },
+      "members": {
+        "count": "[to be translated]:{{count}} members",
+        "empty": "[to be translated]:Drag a single chat from the left into this conversation to add it to the group",
+        "title": "[to be translated]:Members"
       }
     },
     "history": {
@@ -1102,6 +1123,17 @@
       },
       "new_session": "新工作階段 {{Command}}",
       "new_topic": "新話題 {{Command}}",
+      "participants": {
+        "assistant_action": "[to be translated]:Drag the whole assistant or agent card into the area on the right, or click here to add it to the current chat",
+        "empty": "[to be translated]:Drag assistants or agents from the left into this area, or click the + button beside one",
+        "team": {
+          "moderator": "[to be translated]:Moderator",
+          "round_robin": "[to be translated]:Round Robin",
+          "selector": "[to be translated]:Selector",
+          "strategy": "[to be translated]:Discussion Mode",
+          "turns": "[to be translated]:Turns"
+        }
+      },
       "paste_text_file_confirm": "貼到輸入框？",
       "pause": "暫停",
       "placeholder": "在此輸入您的訊息，按 {{key}} 傳送 - @ 選擇模型，/ 包含工具",

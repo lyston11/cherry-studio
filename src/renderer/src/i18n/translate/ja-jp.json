@@ -1027,6 +1027,9 @@
         "description": "日常会話と簡単なQ&A",
         "title": "アシスタントを追加"
       },
+      "group": {
+        "title": "[to be translated]:New Group Chat"
+      },
       "option": {
         "title": "種類を選択"
       },
@@ -1061,9 +1064,27 @@
     "deeply_thought": "深く考えています（{{seconds}} 秒）",
     "default": {
       "description": "こんにちは、私はデフォルトのアシスタントです。すぐにチャットを始められます。",
+      "group_topic": {
+        "name": "[to be translated]:New Group Chat"
+      },
       "name": "デフォルトアシスタント",
       "topic": {
         "name": "デフォルトトピック"
+      }
+    },
+    "group": {
+      "create": {
+        "empty": "[to be translated]:Select at least one assistant before creating a group chat.",
+        "members": "[to be translated]:Choose members",
+        "placeholder": "[to be translated]:Group chat name (optional)"
+      },
+      "drop": {
+        "hint": "[to be translated]:Drop here to add this assistant to the current group chat"
+      },
+      "members": {
+        "count": "[to be translated]:{{count}} members",
+        "empty": "[to be translated]:Drag a single chat from the left into this conversation to add it to the group",
+        "title": "[to be translated]:Members"
       }
     },
     "history": {
@@ -1102,6 +1123,17 @@
       },
       "new_session": "新しいセッション {{Command}}",
       "new_topic": "新しいトピック {{Command}}",
+      "participants": {
+        "assistant_action": "[to be translated]:Drag the whole assistant or agent card into the area on the right, or click here to add it to the current chat",
+        "empty": "[to be translated]:Drag assistants or agents from the left into this area, or click the + button beside one",
+        "team": {
+          "moderator": "[to be translated]:Moderator",
+          "round_robin": "[to be translated]:Round Robin",
+          "selector": "[to be translated]:Selector",
+          "strategy": "[to be translated]:Discussion Mode",
+          "turns": "[to be translated]:Turns"
+        }
+      },
       "paste_text_file_confirm": "入力欄に貼り付けますか？",
       "pause": "一時停止",
       "placeholder": "ここにメッセージを入力し、{{key}} を押して送信...",

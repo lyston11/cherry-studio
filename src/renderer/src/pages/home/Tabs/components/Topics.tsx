@@ -75,7 +75,9 @@ export const Topics: React.FC<Props> = ({ assistant: _assistant, activeTopic, se
   const { t } = useTranslation()
   const { notesPath } = useNotesSettings()
   const { assistants } = useAssistants()
-  const { assistant, addTopic, removeTopic, moveTopic, setModel, updateTopic, updateTopics } = useAssistant(_assistant.id)
+  const { assistant, addTopic, removeTopic, moveTopic, setModel, updateTopic, updateTopics } = useAssistant(
+    _assistant.id
+  )
   const { showTopicTime, pinTopicsToTop, setTopicPosition, topicPosition } = useSettings()
 
   const renamingTopics = useSelector((state: RootState) => state.runtime.chat.renamingTopics)

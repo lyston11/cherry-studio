@@ -1,5 +1,3 @@
-import type Tesseract from 'tesseract.js'
-
 import type { FileMetadata, ImageFileMetadata, TranslateLanguageCode } from '.'
 import { isImageFileMetadata } from '.'
 
@@ -156,7 +154,7 @@ export const isOcrTesseractProvider = (p: OcrProvider): p is OcrTesseractProvide
   return p.id === BuiltinOcrProviderIds.tesseract
 }
 
-export type TesseractLangCode = Tesseract.LanguageCode
+export type TesseractLangCode = string
 
 // System Types
 export type OcrSystemConfig = OcrProviderBaseConfig & {

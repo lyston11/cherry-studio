@@ -61,6 +61,13 @@ vi.stubGlobal('electron', {
   }
 })
 vi.stubGlobal('api', {
+  getAppInfo: vi.fn().mockResolvedValue({
+    appPath: '/mock/app',
+    appDataPath: '/mock/app-data',
+    isPackaged: false,
+    notesPath: '/mock/notes',
+    version: '0.0.0-test'
+  }),
   file: {
     read: vi.fn().mockResolvedValue('[]'),
     writeWithId: vi.fn().mockResolvedValue(undefined)

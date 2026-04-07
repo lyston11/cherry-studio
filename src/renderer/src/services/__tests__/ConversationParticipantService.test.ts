@@ -169,7 +169,13 @@ describe('ConversationParticipantService', () => {
   it('renders shared transcript prompts for agent participants', () => {
     const topic = createTopic([
       { id: 'agent:planner', type: 'agent', sourceAgentId: 'agent-1', label: 'Planner' },
-      { id: 'assistant:critic', type: 'assistant', sourceAssistantId: 'assistant-2', label: 'Critic', model: createModel() }
+      {
+        id: 'assistant:critic',
+        type: 'assistant',
+        sourceAssistantId: 'assistant-2',
+        label: 'Critic',
+        model: createModel()
+      }
     ])
 
     const prompt = buildAgentParticipantTurnPrompt({

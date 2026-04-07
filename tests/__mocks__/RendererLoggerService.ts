@@ -15,7 +15,9 @@ export class MockRendererLoggerService {
     MockRendererLoggerService.instance = new MockRendererLoggerService()
   }
 
-  public initWindowSource(): void {}
+  public initWindowSource(): MockRendererLoggerService {
+    return this
+  }
   public withContext(): MockRendererLoggerService {
     return this
   }
@@ -24,24 +26,12 @@ export class MockRendererLoggerService {
     return 'silly'
   }
   public resetLevel(): void {}
-  public error(...args: any[]): void {
-    console.error(...args)
-  }
-  public warn(...args: any[]): void {
-    console.warn(...args)
-  }
-  public info(...args: any[]): void {
-    console.info(...args)
-  }
-  public verbose(...args: any[]): void {
-    console.log(...args)
-  }
-  public debug(...args: any[]): void {
-    console.debug(...args)
-  }
-  public silly(...args: any[]): void {
-    console.log(...args)
-  }
+  public error(): void {}
+  public warn(): void {}
+  public info(): void {}
+  public verbose(): void {}
+  public debug(): void {}
+  public silly(): void {}
 }
 
 // Create and export the mock instance

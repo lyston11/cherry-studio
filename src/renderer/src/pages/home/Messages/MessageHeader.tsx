@@ -88,10 +88,10 @@ const MessageHeader: FC<Props> = memo(({ assistant, model, message, topic, isGro
   const speakerAvatar = participant?.emoji
   const speakerAvatarIsEmoji = !!speakerAvatar && isEmoji(speakerAvatar)
   const speakerAvatarSrc = speakerAvatar && !speakerAvatarIsEmoji ? speakerAvatar : undefined
-  const speakerAvatarFallback = useMemo(() => firstLetter(username || assistant?.name || 'A').toUpperCase(), [
-    assistant?.name,
-    username
-  ])
+  const speakerAvatarFallback = useMemo(
+    () => firstLetter(username || assistant?.name || 'A').toUpperCase(),
+    [assistant?.name, username]
+  )
 
   const showMiniApp = useCallback(() => {
     showMinappIcon && model?.provider && openMinappById(model.provider)

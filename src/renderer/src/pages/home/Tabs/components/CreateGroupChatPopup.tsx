@@ -86,9 +86,7 @@ const PopupContainer: FC<Props> = ({ assistants, initialSelectedAssistantIds = [
         </SectionHeader>
 
         <AssistantList>
-          <Checkbox.Group
-            value={selectedAssistantIds}
-            onChange={(values) => setSelectedAssistantIds(values as string[])}>
+          <Checkbox.Group value={selectedAssistantIds} onChange={setSelectedAssistantIds}>
             {assistantOptions.map(({ id, assistant }) => (
               <AssistantOption key={id}>
                 <Checkbox value={id}>

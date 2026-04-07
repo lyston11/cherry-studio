@@ -1114,7 +1114,8 @@ const createConversationResponseRunner = ({
 
     if (
       ensuredTarget.model &&
-      (assistantMessage.modelId !== ensuredTarget.model.id || assistantMessage.model?.provider !== ensuredTarget.model.provider)
+      (assistantMessage.modelId !== ensuredTarget.model.id ||
+        assistantMessage.model?.provider !== ensuredTarget.model.provider)
     ) {
       dispatch(
         newMessagesActions.updateMessage({
@@ -1139,11 +1140,14 @@ const createConversationResponseRunner = ({
 
     const topic = getTopicFromState(getState(), topicId)
     const messages = selectMessagesForTopic(getState(), topicId).filter((message) => message.id !== assistantMessage.id)
-    const requestContent = [executionOptions?.turnPrompt, buildAgentParticipantTurnPrompt({
-      participantLabel: assistantMessage.participantLabel ?? target.participantLabel,
-      topic,
-      messages
-    })]
+    const requestContent = [
+      executionOptions?.turnPrompt,
+      buildAgentParticipantTurnPrompt({
+        participantLabel: assistantMessage.participantLabel ?? target.participantLabel,
+        topic,
+        messages
+      })
+    ]
       .filter(Boolean)
       .join('\n\n')
 
@@ -1169,13 +1173,7 @@ const createConversationResponseRunner = ({
   }
 }
 
-const getHiddenOrchestratorAssistant = ({
-  topic,
-  assistant,
-}: {
-  topic?: Topic
-  assistant: Assistant
-}) => {
+const getHiddenOrchestratorAssistant = ({ topic, assistant }: { topic?: Topic; assistant: Assistant }) => {
   const topicOwnerAssistant = topic ? getAssistantById(topic.assistantId) : undefined
   const orchestrator = topicOwnerAssistant ?? assistant
   const model = orchestrator.model ?? orchestrator.defaultModel ?? assistant.model ?? assistant.defaultModel
@@ -1285,9 +1283,12 @@ const buildCollaborativeTargetCapabilitySummaries = async ({
   resolveAgent?: ResolveConversationAgent
 }): Promise<CollaborativeTargetCapabilitySummary> => {
   const summaries: CollaborativeTargetCapabilitySummary = {}
-  const agentTargets = targets.filter((target): target is Extract<ConversationResponseTarget, { kind: 'agent' }> => target.kind === 'agent')
+  const agentTargets = targets.filter(
+    (target): target is Extract<ConversationResponseTarget, { kind: 'agent' }> => target.kind === 'agent'
+  )
   const apiServer = getState().settings.apiServer
-  const agentClient = agentTargets.length > 0 && apiServer.enabled && apiServer.apiKey ? createAgentClient(apiServer) : undefined
+  const agentClient =
+    agentTargets.length > 0 && apiServer.enabled && apiServer.apiKey ? createAgentClient(apiServer) : undefined
 
   await Promise.all(
     targets.map(async (target) => {
@@ -1394,19 +1395,22 @@ const planNextCollaborativeTurn = async ({
     topic,
     assistant
   })
-  const plannerPrompt = [orchestratorAssistant.prompt, buildHiddenOrchestratorPrompt({
-    topic,
-    targets: planningTargets,
-    turnIndex,
-    maxTurns,
-    lastSpeakerLabel,
-    hasVisibleReplies: turnIndex > 0,
-    targetCapabilitySummaries,
-    latestUserRequest: discussionSignals.latestUserRequest,
-    directlyAddressedParticipants: discussionSignals.directlyAddressedParticipants,
-    suggestedVisibleReplyCount: discussionSignals.suggestedVisibleReplyCount,
-    visibleReplyCount: discussionSignals.visibleReplyCount
-  })]
+  const plannerPrompt = [
+    orchestratorAssistant.prompt,
+    buildHiddenOrchestratorPrompt({
+      topic,
+      targets: planningTargets,
+      turnIndex,
+      maxTurns,
+      lastSpeakerLabel,
+      hasVisibleReplies: turnIndex > 0,
+      targetCapabilitySummaries,
+      latestUserRequest: discussionSignals.latestUserRequest,
+      directlyAddressedParticipants: discussionSignals.directlyAddressedParticipants,
+      suggestedVisibleReplyCount: discussionSignals.suggestedVisibleReplyCount,
+      visibleReplyCount: discussionSignals.visibleReplyCount
+    })
+  ]
     .filter(Boolean)
     .join('\n\n')
   const transcript = buildParticipantTranscript(messages)
@@ -1515,7 +1519,8 @@ const orchestrateCollaborativeConversation = async ({
 
     const previousSpeakerLabel = lastSpeakerKey
       ? getConversationResponseTargetLabel(
-          currentTargets.find((target) => getConversationResponseTargetKey(target) === lastSpeakerKey) ?? plannedTurn.target
+          currentTargets.find((target) => getConversationResponseTargetKey(target) === lastSpeakerKey) ??
+            plannedTurn.target
         )
       : undefined
 
@@ -1536,7 +1541,9 @@ const orchestrateCollaborativeConversation = async ({
       assistantMessage,
       executionOptions: {
         prefetchedAgent:
-          plannedTurn.target.kind === 'agent' ? await resolveAgent(plannedTurn.target.agentId).catch(() => undefined) : undefined,
+          plannedTurn.target.kind === 'agent'
+            ? await resolveAgent(plannedTurn.target.agentId).catch(() => undefined)
+            : undefined,
         turnPrompt: buildSelectedSpeakerPrompt({
           participantLabel: getConversationResponseTargetLabel(plannedTurn.target),
           turnIndex,
@@ -1839,7 +1846,14 @@ export const sendMessage =
         })
 
         if (responseTargets.length > 0) {
-          await dispatchConversationResponseTargets(dispatch, getState, topicId, userMessage, assistant, responseTargets)
+          await dispatchConversationResponseTargets(
+            dispatch,
+            getState,
+            topicId,
+            userMessage,
+            assistant,
+            responseTargets
+          )
         } else {
           const assistantMessage = createAssistantMessage(assistant.id, topicId, {
             askId: userMessage.id,
@@ -2134,7 +2148,9 @@ export const resendMessageThunk =
 
       // 再处理新的重传（用户消息提及，但是现有助手消息中不存在提及的模型）
       const existingTargetKeys = new Set(resetDataList.map(getAssistantMessageMatchKey))
-      const missingTargets = responseTargets.filter((target) => !existingTargetKeys.has(getResponseTargetMatchKey(target)))
+      const missingTargets = responseTargets.filter(
+        (target) => !existingTargetKeys.has(getResponseTargetMatchKey(target))
+      )
       for (const target of missingTargets) {
         const assistantMessage = createAssistantMessageForTarget({
           target,

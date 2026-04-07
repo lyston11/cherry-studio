@@ -2,13 +2,12 @@ import { loggerService } from '@logger'
 import { getIpCountry } from '@main/utils/ipService'
 import { loadOcrImage } from '@main/utils/ocr'
 import { MB } from '@shared/config/constant'
-import type { ImageFileMetadata, OcrResult, OcrTesseractConfig, SupportedOcrFile } from '@types'
+import type { ImageFileMetadata, OcrResult, OcrTesseractConfig, SupportedOcrFile, TesseractLangCode } from '@types'
 import { isImageFileMetadata } from '@types'
 import { app } from 'electron'
 import fs from 'fs'
 import { isEqual } from 'lodash'
 import path from 'path'
-import type { LanguageCode } from 'tesseract.js'
 import type Tesseract from 'tesseract.js'
 import { createWorker } from 'tesseract.js'
 
@@ -18,7 +17,7 @@ const logger = loggerService.withContext('TesseractService')
 
 // config
 const MB_SIZE_THRESHOLD = 50
-const defaultLangs = ['chi_sim', 'chi_tra', 'eng'] satisfies LanguageCode[]
+const defaultLangs = ['chi_sim', 'chi_tra', 'eng'] satisfies TesseractLangCode[]
 enum TesseractLangsDownloadUrl {
   CN = 'https://gitcode.com/beyondkmp/tessdata-best/releases/download/1.0.0/'
 }
@@ -33,10 +32,10 @@ export class TesseractService extends OcrBaseService {
   }
 
   async getWorker(options?: OcrTesseractConfig): Promise<Tesseract.Worker> {
-    let langsArray: LanguageCode[]
+    let langsArray: TesseractLangCode[]
     if (options?.langs) {
       // TODO: use type safe objectKeys
-      langsArray = Object.keys(options.langs) as LanguageCode[]
+      langsArray = Object.keys(options.langs)
       if (langsArray.length === 0) {
         logger.warn('Empty langs option. Fallback to defaultLangs.')
         langsArray = defaultLangs

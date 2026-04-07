@@ -190,7 +190,7 @@ describe('StreamEventManager', () => {
 
     describe('Type Guard Validation', () => {
       it('should warn on type mismatch between LanguageModelUsage and EmbeddingModelUsage', () => {
-        const warnSpy = vi.spyOn(console, 'warn')
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
         const target: Partial<LanguageModelUsage> = { inputTokens: 10 }
         const source: Partial<EmbeddingModelUsage> = { tokens: 5 }
 
@@ -208,7 +208,7 @@ describe('StreamEventManager', () => {
       })
 
       it('should warn on type mismatch between ImageModelUsage and EmbeddingModelUsage', () => {
-        const warnSpy = vi.spyOn(console, 'warn')
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
         const target: Partial<ImageModelUsage> = { inputTokens: 100 }
         const source: Partial<EmbeddingModelUsage> = { tokens: 50 }
 
@@ -542,7 +542,7 @@ describe('StreamEventManager', () => {
     })
 
     it('should warn when no fullStream is found', async () => {
-      const warnSpy = vi.spyOn(console, 'warn')
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       const controller = createMockStreamController()
 
       const context = createMockContext({
