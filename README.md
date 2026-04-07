@@ -77,7 +77,9 @@ Cherry Studio Group Chat Edition is a desktop client that supports multiple LLM 
 
 # 🌠 Screenshot
 
-![](https://github.com/user-attachments/assets/36dddb2c-e0fb-4a5f-9411-91447bab6e18)
+![](./docs/images/group-chat-home.png)
+
+![](./docs/images/group-chat-discussion.png)
 
 ![](https://github.com/user-attachments/assets/f549e8a0-2385-40b4-b52b-2039e39f2930)
 
